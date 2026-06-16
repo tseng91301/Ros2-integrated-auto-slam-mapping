@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="robot_description" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <link
+    name="base_footprint">
+  </link>
+  <joint
+    name="base_footprint_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 0.078"
+      rpy="0 0 0" />
+    <parent
+      link="base_footprint" />
+    <child
+      link="base_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.0122364829017465 -0.000404057892084323 0.125785448017307"
+        rpy="0 0 0" />
+      <mass
+        value="0.684978129187124" />
+      <inertia
+        ixx="0.00354315733401786"
+        ixy="7.91880564822791E-07"
+        ixz="-1.63705810766853E-07"
+        iyy="0.00403179135167934"
+        iyz="-1.52216463972813E-07"
+        izz="0.00432786345604145" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/base_link.STL" />
+      </geometry>
+      <material name="base_color">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+    <!-- left front wheel -->
+  <link name="left_front_wheel_link">
+    <inertial>
+      <origin xyz="0 2.7728E-07 0.00017522" rpy="0 0 0"/>
+      <mass value="0.87209"/>
+      <inertia ixx="0.001446" ixy="0" ixz="0" iyy="0.001446" iyz="1.7804E-06" izz="0.0025711"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/left_front_wheel_link.STL"/>
+      </geometry>
+      <material name="left_front">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/left_front_wheel_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="left_front_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_front_wheel_link"/>
+    <origin xyz="0.128 0.15065 -4.5101E-05" rpy="-1.5708 0 0"/>
+    <axis xyz="0 0.0015825 1"/>
+  </joint>
+
+  <!-- left rear wheel -->
+  <link name="left_rear_wheel_link">
+    <inertial>
+      <origin xyz="0 2.7728E-07 0.00017522" rpy="0 0 0"/>
+      <mass value="0.87209"/>
+      <inertia ixx="0.001446" ixy="0" ixz="0" iyy="0.001446" iyz="1.7804E-06" izz="0.0025711"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/left_rear_wheel_link.STL"/>
+      </geometry>
+      <material name="left_rear">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/left_rear_wheel_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="left_rear_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_rear_wheel_link"/>
+    <origin xyz="-0.128 0.15065 -4.5101E-05" rpy="-1.5708 0 0"/>
+    <axis xyz="0 0.0015825 1"/>
+  </joint>
+
+  <!-- right front wheel -->
+  <link name="right_front_wheel_link">
+    <inertial>
+      <origin xyz="0 2.7728E-07 0.00017522" rpy="0 0 0"/>
+      <mass value="0.87209"/>
+      <inertia ixx="0.001446" ixy="0" ixz="0" iyy="0.001446" iyz="1.7804E-06" izz="0.0025711"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/right_front_wheel_link.STL"/>
+      </geometry>
+      <material name="right_front">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/right_front_wheel_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="right_front_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_front_wheel_link"/>
+    <origin xyz="0.128 -0.15065 -4.5101E-05" rpy="-1.5708 0 3.1416"/>
+    <axis xyz="0 -0.0015825 -1"/>
+  </joint>
+
+  <!-- right rear wheel -->
+  <link name="right_rear_wheel_link">
+    <inertial>
+      <origin xyz="0 2.7728E-07 0.00017522" rpy="0 0 0"/>
+      <mass value="0.87209"/>
+      <inertia ixx="0.001446" ixy="0" ixz="0" iyy="0.001446" iyz="1.7804E-06" izz="0.0025711"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/right_rear_wheel_link.STL"/>
+      </geometry>
+      <material name="right_rear">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/right_rear_wheel_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="right_rear_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_rear_wheel_link"/>
+    <origin xyz="-0.128 -0.15065 -4.5101E-05" rpy="-1.5708 0 3.1416"/>
+    <axis xyz="0 -0.0015825 -1"/>
+  </joint>
+
+  <!-- sonar_1~4 -->
+  <xacro:macro name="sonar" params="suffix *joint_origin">
+    <link
+      name="Sonar_${suffix}">
+    </link>
+    <joint
+      name="Sonar_${suffix}_joint"
+      type="fixed">
+      <xacro:insert_block name="joint_origin"/>
+      <parent
+        link="base_link" />
+      <child
+        link="Sonar_${suffix}" />
+      <axis
+        xyz="0 0 0" />
+    </joint>  
+  </xacro:macro>
+  <xacro:sonar suffix="1">
+    <origin
+      xyz="0.203 0 0.042895"
+      rpy="0 0 0" />
+  </xacro:sonar>
+  <xacro:sonar suffix="2">
+    <origin
+      xyz="0 -0.113 0.074895"
+      rpy="0 0 -1.5708" />
+  </xacro:sonar>
+  <xacro:sonar suffix="3">
+    <origin
+      xyz="-0.203 0 0.042895"
+      rpy="0 0 3.1416" />
+  </xacro:sonar>
+  <xacro:sonar suffix="4">
+    <origin
+      xyz="0 0.113 0.074895"
+      rpy="0 0 1.5708" />
+  </xacro:sonar>
+
+
+  <link
+    name="laser">
+    <inertial>
+      <origin
+        xyz="0.017613 -5.1695E-05 -0.027921"
+        rpy="0 0 0" />
+      <mass
+        value="7.1454" />
+      <inertia
+        ixx="0.35495"
+        ixy="-9.5859E-05"
+        ixz="0.012781"
+        iyy="0.35763"
+        iyz="-4.962E-05"
+        izz="0.19536" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/base_rplidar_link.STL" />
+      </geometry>
+      <material name="laser_color">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/base_rplidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="base_laser_joint"
+    type="fixed">
+    <origin
+      xyz="0.012833 0 0.28"
+      rpy="0 0 0" />
+    <parent
+      link="base_footprint" />
+    <child
+      link="laser" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+
+
+  <link
+    name="camera_link">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0" />
+      <inertia
+        ixx="0"
+        ixy="0"
+        ixz="0"
+        iyy="0"
+        iyz="0"
+        izz="0" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/camera_link.STL" />
+      </geometry>
+      <material name="camera_color">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://wheeltec_robot_urdf/meshes/playrobot_meshes/camera_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="camera_joint"
+    type="fixed">
+    <origin
+      xyz="0.1705 0.0 0.2"
+      rpy="0 0 0" />
+    <parent
+      link="base_footprint" />
+    <child
+      link="camera_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>
