@@ -1,144 +1,94 @@
-# 🚀 Wheeltec ROS 2 常用指令集合 (Command Cheat Sheet)
+# 🚀 Jetson Thor 機器人環境部署與開發指南 (General Readme)
 
-本文件整理了此工作空間常用功能所需的指令。所有指令均以 **「剛進入此專案，尚未開啟任何終端機與節點」** 的狀態為前提設計。
+歡迎使用本專案！本工作空間整合了 **Advantech AFE-A702 (Jetson Thor)** 硬體驅動、**Docker (NVIDIA Isaac ROS)** 容器環境，以及 **ROS 2** 機器人控制軟體包（包含馬達底盤驅動與 RPLIDAR A2M12 雷達）。
+
+本文件為專案的 **主入口說明文件**。為使結構清晰，具體之技術細節與指令已被拆分至獨立的子指南中。
+
+---
+
+## 🗺️ 專案指南目錄 (Table of Contents)
+
+請根據您目前的開發進度，點擊以下連結閱讀專屬的設定與操作指南：
+
+| 順序 | 指南名稱 | 內容說明 | 連結檔案路徑 |
+| :---: | :--- | :--- | :--- |
+| **1** | **🔌 硬體命名與 Udev 規則** | 設定雷達CP2102與底盤CH340之硬體串行埠固定名稱 | [udev-rules.md](file:///home/ubuntu/setup_data/udev-rules.md) |
+| **2** | **📦 Docker 裝置掛載與串接** | 如何將雷達與底盤硬體節點動態/靜態地掛載進運行中的 Docker 容器 | [docker_device_connection.md](file:///home/ubuntu/workspaces/isaac_ros-dev/docker_device_connection.md) |
+| **3** | **🐳 Isaac ROS 容器啟動與安裝** | 初始化 Isaac ROS CLI、拉取容器鏡像、啟動容器與安裝 NITROS / AprilTag 套件 | [isaac_ros_setup.md](file:///home/ubuntu/workspaces/isaac_ros-dev/isaac_ros_setup.md) |
+| **4** | **🚀 ROS 2 常用指令與開發工具** | 工作空間編譯（colcon build）、運行節點（run/launch）、X11 圖形轉送（rviz2）與指令速查 | [ros2_commands_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/ros2_commands_guide.md) |
+
+---
+
+## 📋 Host 本機端基礎驅動與環境安裝
 
 > [!IMPORTANT]
-> 在開啟任何**新的終端機視窗/分頁**後，請務必先執行以下環境變數載入指令：
-> ```bash
-> cd /home/ubuntu/steven_verify_ws
-> source install/setup.bash
-> ```
+> 以下步驟皆在 **Host 端的本機終端機** 執行，非 Docker 容器內部。本機系統必須使用 Ubuntu 24.04 (Noble) + Jetpack。
 
----
-
-## 📋 核心功能指令集
-
-### 1. 🏎️ 底盤開啟 (Chassis Control)
-啟動底盤的通訊與編碼器回傳，讓機器人可以接收 `/cmd_vel` 移動指令：
+### 1. 📡 無線網卡驅動安裝
+如果您的系統尚未能連接 Wi-Fi 或藍芽，請使用原始碼編譯驅動程式：
 ```bash
-ros2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py
-# For this bot
-ros2 launch base_control_ros2 00_base_control.launch.py
+cd /home/ubuntu/setup_data/drivers/WiFi_Bluetooth_Drivers
+# 執行網卡安裝腳本
+chmod +x setup.sh
+./setup.sh
 ```
 
-### 2. ⌨️ 鍵盤控制機器人移動 (Keyboard Control)
-啟動鍵盤控制節點，利用鍵盤遙控車輛：
+### 2. 🔌 CH341 序列埠驅動安裝 (馬達底盤通訊晶片)
+馬達控制主板使用 CH340/341 晶片，核心編譯安裝步驟如下：
 ```bash
-ros2 run wheeltec_robot_keyboard wheeltec_keyboard
+cd /home/ubuntu/setup_data/drivers/ch341ser_linux
+chmod +x setup.sh
+# 執行編譯與載入模組腳本
+./setup.sh
 ```
-*   **控制按鍵**：`i` (前進)、`,` (後退)、`j` (左轉)、`l` (右轉)、`k` (停止)
-*   **調整速度**：`q`/`z` 增加/減少最大速度 10%
+*載入成功後，插入底盤 USB，Host 端應可看見 `/dev/ttyCH341USB0` 裝置節點。*
 
-### 3. 📡 打開 Lidar 節點 (Lidar Driver)
-單獨啟動雷射雷達，使雷達轉動並發布 `/scan` 點雲資料 (目前配置為 RPLIDAR A2M12)：
+### 3. 🖥️ 遠端桌面工具 (NoMachine) 安裝
 ```bash
-ros2 launch sllidar_ros2 sllidar_a2m12_launch.py
-```
-
-### 4. 🗺️ 建立地圖 (SLAM Toolbox Only)
-單獨啟動 SLAM Toolbox 異步建圖節點 (適合自行播放 rosbag 點雲或單獨測試建圖演算法時使用)：
-```bash
-ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py
+# 下載 NoMachine ARM64 官方安裝包
+wget https://www.nomachine.com/free/arm/v8/deb -O nomachine-arm64.deb
+# 執行安裝
+sudo dpkg -i nomachine-arm64.deb
 ```
 
----
-
-## 🧭 遙控建圖完整流程 (Manual SLAM Mapping)
-
-這是您要進行「手動控制車輛並同時建立地圖」時，最標準且最常使用的指令流程。請依序開啟不同的終端機視窗並載入環境變數：
-
-### 步驟 1：啟動主控與建圖程式 (包含底盤 + 雷達 + SLAM + RViz2)
-在**第一個終端機**執行以下指令。此指令會整合啟動底盤、雷達、SLAM，並自動打開 RViz2 呈現地圖與掃描紅線：
+### 4. 📷 ZED X 相機 GMSL 驅動與 SDK 安裝
 ```bash
-ros2 launch wheeltec_slam_toolbox online_async_launch.py
+sudo apt update
+sudo apt install -y libqt5core5a zstd
+# 接著依據 ZED SDK 官方指示安裝對應的 Tegra L4T 驅動
 ```
 
-### 步驟 2：啟動鍵盤遙控節點
-在**第二個終端機**執行以下指令，並保持在此視窗中，使用鍵盤操作車輛在環境中移動以掃描地圖：
+### 5. 🐳 Docker 引擎與 NVIDIA Toolkit 設定
 ```bash
-ros2 run wheeltec_robot_keyboard wheeltec_keyboard
-```
+# 安裝基礎 Docker 引擎
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo bash get-docker.sh && rm get-docker.sh
+sudo usermod -aG docker $USER
 
-### 步驟 3：儲存地圖 (建圖完成後)
-當您滿意 RViz2 畫面上建立出來的地圖後，開啟**第三個終端機**執行儲存指令：
-```bash
-ros2 run nav2_map_server map_saver_cli -f ~/map
-```
-*   地圖將儲存在您的家目錄，包含：`~/map.pgm` (地圖圖檔) 與 `~/map.yaml` (地圖資訊定義檔)。
-
----
-
-## 🧩 分步啟動流程 (Step-by-Step / One-by-One Startup)
-
-如果您不希望使用整合式的啟動檔，而是想一個一個節點獨立啟動與除錯，請依序在**不同的終端機分頁**中執行以下指令（皆須先執行環境變數載入）：
-
-### 1. 啟動底盤控制與 EKF (Chassis & Odom)
-```bash
-export BASE_TYPE=NanoRobot
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 launch base_control_ros2 00_base_control.launch.py
-```
-
-### 2. 啟動雷達節點 (Lidar)
-```bash
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 launch sllidar_ros2 sllidar_a2m12_launch.py
-```
-
-### 3. 啟動 SLAM 建圖演算法節點 (SLAM Toolbox)
-```bash
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py
-```
-
-### 4. 啟動視覺化介面 (RViz2)
-```bash
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 run rviz2 rviz2 -d /home/ubuntu/steven_verify_ws/wheeltec_slam_toolbox.rviz
-# or
-rviz2
-```
-
-### 5. 啟動鍵盤遙控節點 (Keyboard Control)
-```bash
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 run wheeltec_robot_keyboard wheeltec_keyboard
-```
-
-### 6. 儲存地圖 (Save Map)
-```bash
-source /home/ubuntu/steven_verify_ws/install/setup.bash
-ros2 run nav2_map_server map_saver_cli -f ~/map
+# 註冊 NVIDIA Runtime 並重啟 Docker 服務
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
 
 ---
 
-## 📷 ZED 相機驅動指令 (ZED Camera)
+## 📂 專案目錄結構說明
 
-啟動 ZED 深度相機節點。請依據您的相機型號 (如 `zed`, `zed2`, `zed2i`, `zedx` 等) 調整 `camera_model` 參數：
-```bash
-ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zedx
+```text
+/home/ubuntu/
+├── setup_data/                      # Host 本機設定與驅動包
+│   ├── Readme.md                    # 本主入口說明文件
+│   ├── udev-rules.md                # Udev 命名設定指南
+│   ├── drivers/                     # 網卡與序列埠驅動原始碼
+│   └── isaac-ros-jetson-thor-jazzy-install/  # Docker 初始化啟動腳本與驗證包
+│
+└── workspaces/
+    └── isaac_ros-dev/               # 主要 ROS 2 工作空間 (已掛載至 Docker 內)
+        ├── src/                     # ROS 2 功能包原始碼
+        ├── attach_devices.sh        # ⚡ 動態裝置掛載輔助腳本
+        ├── docker_device_connection.md # 裝置掛載指南
+        ├── isaac_ros_setup.md       # 容器啟動指南
+        └── ros2_commands_guide.md   # 指令與編譯指南
 ```
-*   *(常用型號參數值包括：`zed`, `zedm`, `zed2`, `zed2i`, `zedx`, `zedxm` 等)*
 
----
-
-## ⚙️ 系統編譯與硬體設定
-
-### 🔨 重新編譯整個工作空間
-若修改了任何程式碼或啟動檔，請先清除快取並重新編譯：
-```bash
-cd /home/ubuntu/steven_verify_ws
-rm -rf build/ install/ log/
-colcon build --symlink-install
-```
-
-### 🔌 硬體連接埠別名設定 (Udev Rules)
-若重新安裝系統或插拔 USB 連接埠後無法讀取設備，請重新應用 Udev 規則：
-```bash
-# 寫入設定規則檔
-echo -e 'SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="4157d26cd879ca418ca0e378084f3ed7", SYMLINK+="sllidar_a2m12"\nSUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="playrobot_base"' | sudo tee /etc/udev/rules.d/99-usb-serial.rules
-
-# 重新載入規則
-sudo udevadm control --reload-rules && sudo udevadm trigger
-```
+如有任何硬體驅動或軟體編譯上的疑慮，請優先點擊閱讀對應的 `.md` 文件。

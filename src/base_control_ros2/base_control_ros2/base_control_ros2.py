@@ -495,15 +495,12 @@ class BaseControl(Node):
                         self.get_logger().info("Circleloop.enqueue Faild")
         else:
             pass
-        if self.Circleloop.is_empty()==False:
-            if self.Circleloop.is_empty()==False:
-                data = self.Circleloop.get_front()
-            else:
-                pass
+        while self.Circleloop.get_queue_length() >= 2:
+            data = self.Circleloop.get_front()
             if data == 0x5a:
                 length = self.Circleloop.get_front_second()
                 if length > 1 :
-                    if self.Circleloop.get_front_second() <= self.Circleloop.get_queue_length():
+                    if length <= self.Circleloop.get_queue_length():
                         databuf = []
                         for i in range(length):
                             databuf.append(self.Circleloop.get_front())
@@ -602,8 +599,10 @@ class BaseControl(Node):
                             self.get_logger().info("Invalid Index")
                             # self.get_logger().info()
                             pass
+                    else:
+                        break
                 else:
-                    pass
+                    self.Circleloop.dequeue()
             else:
                 self.Circleloop.dequeue()
         else:
