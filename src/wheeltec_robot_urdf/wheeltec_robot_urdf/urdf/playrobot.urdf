@@ -266,7 +266,7 @@
     type="fixed">
     <origin
       xyz="0.012833 0 0.28"
-      rpy="0 0 0" />
+      rpy="0 0 3.1415926" />
     <parent
       link="base_footprint" />
     <child
