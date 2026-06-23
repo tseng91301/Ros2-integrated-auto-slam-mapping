@@ -16,6 +16,7 @@
 | **2** | **📦 Docker 裝置掛載與串接** | 如何將雷達與底盤硬體節點動態/靜態地掛載進運行中的 Docker 容器 | [docker_device_connection.md](file:///home/ubuntu/workspaces/isaac_ros-dev/docker_device_connection.md) |
 | **3** | **🐳 Isaac ROS 容器啟動與安裝** | 初始化 Isaac ROS CLI、拉取容器鏡像、啟動容器與安裝 NITROS / AprilTag 套件 | [isaac_ros_setup.md](file:///home/ubuntu/workspaces/isaac_ros-dev/isaac_ros_setup.md) |
 | **4** | **🚀 ROS 2 常用指令與開發工具** | 工作空間編譯（colcon build）、運行節點（run/launch）、X11 圖形轉送（rviz2）與指令速查 | [ros2_commands_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/ros2_commands_guide.md) |
+| **5** | **📡 網頁遙控與實時建圖指南** | 手機/電腦瀏覽器實時搖桿遙控、地圖顯示與地圖下載操作說明 | [web_teleop_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/web_teleop_guide.md) |
 
 ---
 
