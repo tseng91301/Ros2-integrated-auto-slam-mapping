@@ -35,6 +35,10 @@ for path in \
   /usr/src/jetson_multimedia_api \
   /usr/src/jetson_sipl_api \
   /usr/share/vpi3 \
+  /usr/local/zed \
+  /usr/local/cuda \
+  /usr/local/cuda-13 \
+  /usr/local/cuda-13.0 \
   /dev/input \
   /dev/bus/usb \
   /dev/video0 \
