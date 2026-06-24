@@ -43,6 +43,7 @@ show_help() {
     echo "  $0 teleop       - 啟動底盤控制器 + 鍵盤遙控 (雙分割畫面)"
     echo "  $0 slam_all     - 啟動底盤 + 雷達 + SLAM 建圖 + 鍵盤遙控 + RViz2 (多視窗格與分頁)"
     echo "  $0 web_all      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + RViz2 (多視窗格與分頁)"
+    echo "  $0 explore      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + 自主探索 + RViz2 (五分割畫面)"
     echo "  $0 terminal     - 單純開啟一個 source 好環境的 ROS 2 Docker 互動終端機 (加 -kill 強制清理舊進程)"
     echo ""
     echo "⚙️ 全局參數選項 (Options):"
@@ -57,6 +58,7 @@ show_help() {
     echo "    slam          - SLAM Toolbox 異步建圖"
     echo "    keyboard      - 鍵盤遙控節點"
     echo "    web           - 網頁遙控與實時建圖伺服器"
+    echo "    explorer      - 邊界自主探索節點 (Frontier Auto Explorer)"
     echo "    rviz / rviz2  - RViz2 視覺化工具 (載入 SLAM 設定)"
     echo ""
     echo "  自訂範例: $0 chassis lidar        (只啟動底盤與雷達)"
@@ -232,6 +234,53 @@ if [ "$1" == "web_all" ]; then
     exit 0
 fi
 
+# ==================== 預設模式 3.5: explore ====================
+if [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
+    echo "🚀 正在以 [explore] 模式啟動底盤、雷達、建圖、網頁監控、自動探索與 RViz2..."
+    
+    # 建立會話，第一個分頁命名為 SLAM
+    tmux new-session -d -s "$SESSION_NAME" -n "SLAM"
+    
+    # 1. 啟動底盤 (左上角) - 寫入當前活動的 pane 0
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch base_control_ros2 00_base_control.launch.py'" C-m
+    
+    # 左右分割：右側 (新分割出的活動 pane 1)
+    tmux split-window -h -t "$SESSION_NAME"
+    # 右上角: SLAM 建圖
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py'" C-m
+    
+    # 選擇左側窗格 (索引 0)
+    tmux select-pane -t 0
+    # 上下分割左側：左下角 (新分割出的活動 pane 1，原右側變為 2)
+    tmux split-window -v -t "$SESSION_NAME"
+    # 左下角: 雷達
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=/dev/sllidar_a2m12'" C-m
+    
+    # 選擇右側右上窗格 (此時索引已變為 2)
+    tmux select-pane -t 2
+    # 上下分割右側：右下角 (新分割出的活動 pane 3)
+    tmux split-window -v -t "$SESSION_NAME"
+    # 右下角: 網頁遙控與伺服器
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_teleop.launch.py'" C-m
+    
+    # 選擇網頁遙控窗格 (此時索引為 3)
+    tmux select-pane -t 3
+    # 上下分割右下角：右下偏下 (新分割出的活動 pane 4)
+    tmux split-window -v -t "$SESSION_NAME"
+    # 最右下角: 自動探索節點
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch auto_explorer auto_exploration.launch.py'" C-m
+    
+    # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2
+    tmux new-window -t "$SESSION_NAME" -n "RViz2"
+    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
+    
+    # 回到第一個分頁並選取自動探索窗格 (此時索引為 4)
+    tmux select-window -t "$SESSION_NAME:0"
+    tmux select-pane -t 4
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
 # ==================== 預設模式 4: terminal ====================
 if [ "$1" == "terminal" ]; then
     echo "🚀 正在啟動包含 ROS 2 環境變數 (ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL}) 的 Docker 互動終端機..."
@@ -281,6 +330,9 @@ for arg in "$@"; do
             ;;
         web)
             commands+=("ros2 launch wheeltec_web_teleop web_teleop.launch.py")
+            ;;
+        explorer)
+            commands+=("ros2 launch auto_explorer auto_exploration.launch.py")
             ;;
         rviz|rviz2)
             commands+=("export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz")
