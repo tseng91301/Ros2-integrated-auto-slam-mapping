@@ -140,4 +140,55 @@
 > [!TIP]
 > **地圖格式說明**：
 > * `map.pgm`：黑白像素地圖（0 為可行走區域，255 為未知，100 為障礙物/牆壁）。
-> * `map.yaml`：描述地圖的解析度（Resolution）、地圖原點座標（Origin）以及關聯的 pgm 檔案路徑。
+> * `map.yaml`：描述地圖的解析度（Resolution）、地圖原點座標（Origin）以及關聯 the pgm 檔案路徑。
+
+---
+
+## 📦 6. 依賴套件與疑難排解 (Dependencies & Troubleshooting)
+
+本專案功能包依賴於部分特定的系統套件與 Python 程式庫。如果您的 Docker 容器在初始化或重建後，遇到程式崩潰或缺少套件的錯誤（例如 `ModuleNotFoundError` 或 CMake 找不到套件），請參考以下統一的修復指引：
+
+### ⚠️ 常見的缺失套件錯誤：
+* **Python 套件缺失**：`ModuleNotFoundError: No module named 'tornado'` 或 `ModuleNotFoundError: No module named 'quaternion'`。
+* **ROS 2 套件或 Message 缺失**：無法導入 `cv_bridge`、`realsense2_camera_msgs`，或是編譯時提示找不到 `nav2_bringup` 套件。
+
+### 🛠️ 統一安裝與固化解決方案：
+
+1. **進入運作中的 Docker 容器內部**：
+   ```bash
+   docker exec -it isaac_ros_dev_container /bin/bash
+   ```
+
+2. **在容器內部一鍵安裝所有缺失套件**：
+   ```bash
+   # 更新套件清單並安裝 ROS 2 與系統級套件
+   sudo apt-get update && sudo apt-get install -y \
+     ros-jazzy-cv-bridge \
+     ros-jazzy-nav2-common \
+     ros-jazzy-nav2-simple-commander \
+     ros-jazzy-navigation2 \
+     ros-jazzy-nav2-bringup \
+     ros-jazzy-xacro \
+     ros-jazzy-tf-transformations \
+     ros-jazzy-theora-image-transport \
+     ros-jazzy-realsense2-camera \
+     ros-jazzy-realsense2-camera-msgs \
+     ros-jazzy-librealsense2 \
+     python3-tornado \
+     python3-pip \
+     python3-matplotlib \
+     python3-requests \
+     python3-serial \
+     python3-tqdm
+
+   # 使用 pip 安裝 Python 特有依賴（需突破系統套件限制）
+   pip3 install numpy-quaternion pyrealsense2 --break-system-packages
+   ```
+
+3. **固化變更以防容器重啟後遺失**：
+   為防止 Docker 容器在重新建立（如執行 `./start_container.sh`）時，因 `--rm` 參數將變更抹除，請於 **Host 端** 執行以下指令，將運行中容器的狀態固化回 Docker 鏡像：
+   ```bash
+   docker commit isaac_ros_dev_container cached_isaac_run_dev_image_local:latest
+   ```
+
+

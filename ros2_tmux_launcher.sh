@@ -4,15 +4,50 @@
 
 SESSION_NAME="ros2_dev"
 
+# 預設 ROS_DOMAIN_ID
+ROS_DOMAIN_ID_VAL="55"
+
+# 解析自定義參數與選項
+FORCE_KILL="false"
+NEW_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --domain|--domain-id)
+            if [ -n "$2" ] && [[ "$2" =~ ^[0-9]+$ ]]; then
+                ROS_DOMAIN_ID_VAL="$2"
+                shift 2
+            else
+                echo "❌ 錯誤: --domain / --domain-id 後需指定一個數字！"
+                exit 1
+            fi
+            ;;
+        -kill|--kill)
+            FORCE_KILL="true"
+            shift 1
+            ;;
+        *)
+            NEW_ARGS+=("$1")
+            shift 1
+            ;;
+    esac
+done
+# 重新將過濾掉 --domain 的參數設定為 $@
+set -- "${NEW_ARGS[@]}"
+
 # 顯示說明
 show_help() {
     echo "🐳 ROS 2 tmux All-in-One 啟動工具"
-    echo "使用方法: $0 [模式 | 模組清單]"
+    echo "使用方法: $0 [模式 | 模組清單] [--domain <ID>] [-kill]"
     echo ""
     echo "💡 預設預載組合模式 (Presets):"
     echo "  $0 teleop       - 啟動底盤控制器 + 鍵盤遙控 (雙分割畫面)"
     echo "  $0 slam_all     - 啟動底盤 + 雷達 + SLAM 建圖 + 鍵盤遙控 + RViz2 (多視窗格與分頁)"
     echo "  $0 web_all      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + RViz2 (多視窗格與分頁)"
+    echo "  $0 terminal     - 單純開啟一個 source 好環境的 ROS 2 Docker 互動終端機 (加 -kill 強制清理舊進程)"
+    echo ""
+    echo "⚙️ 全局參數選項 (Options):"
+    echo "  --domain / --domain-id <ID>  - 指定自定義的 ROS_DOMAIN_ID (預設為 30)"
+    echo "  -kill / --kill               - 啟動前強制清理舊的 tmux 會話與背景進程"
     echo ""
     echo "🛠️ 自訂模組組合 (Custom Modules):"
     echo "  $0 <模組1> [模組2] [模組3] ..."
@@ -35,10 +70,26 @@ if [ "$#" -lt 1 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     show_help
 fi
 
-# 1. 確保 Docker 容器正在運行
+# 1. 確保 Docker 容器正在運行，若未運行則自動啟動
 if ! docker ps --format '{{.Names}}' | grep -q "^isaac_ros_dev_container$"; then
-    echo "❌ 錯誤: isaac_ros_dev_container 容器未啟動！請先啟動 Docker 容器。"
-    exit 1
+    echo "🔄 偵測到 isaac_ros_dev_container 容器未啟動，正在為您啟動容器..."
+    if [ -f "./start_container.sh" ]; then
+        chmod +x ./start_container.sh
+        ./start_container.sh
+        sleep 2
+    else
+        echo "❌ 錯誤: 找不到 ./start_container.sh，無法自動啟動容器！"
+        exit 1
+    fi
+fi
+
+# 2. 自動執行裝置掛載
+if [ -f "./attach_devices.sh" ]; then
+    echo "🔄 正在自動掛載硬體裝置..."
+    chmod +x ./attach_devices.sh
+    ./attach_devices.sh /dev/playrobot_base /dev/sllidar_a2m12 || true
+else
+    echo "⚠️ 警告: 找不到 ./attach_devices.sh，跳過裝置掛載。"
 fi
 
 # 檢查是否需要啟動 GUI，如果是，先在 Host 本機端執行 xhost 授權 (避免在容器內報錯)
@@ -47,26 +98,39 @@ if [[ " $@ " =~ " rviz " ]] || [[ " $@ " =~ " rviz2 " ]] || [[ " $@ " =~ " slam_
     xhost +local:docker 2>/dev/null || true
 fi
 
-# 2. 清理先前還在運作的 tmux 會話與容器殘留進程
-if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-    echo "🧹 偵測到舊的 tmux 會話 '${SESSION_NAME}' 正在運行，正將其關閉..."
-    tmux kill-session -t "$SESSION_NAME"
+# 3. 判斷是否需要清理先前還在運作的 tmux 會話與容器殘留進程
+# (terminal 模式預設不清理，除非指定了 -kill 參數)
+SHOULD_CLEAN="true"
+if [ "$1" == "terminal" ]; then
+    SHOULD_CLEAN="false"
+fi
+if [ "$FORCE_KILL" == "true" ]; then
+    SHOULD_CLEAN="true"
 fi
 
-# 額外清理容器內可能殘留的 ROS 2 與 Python 節點進程 (避免佔用序列埠或 CPU)
-# 注意：使用 rviz2 (不加 -f) 避免匹配到含 'rviz2' 參數的本腳本名稱，導致腳本被 self-kill
-echo "🧹 正在清理容器內可能殘留的舊節點進程..."
-docker exec isaac_ros_dev_container pkill -9 -f [b]ase_control_node 2>/dev/null || true
-docker exec isaac_ros_dev_container pkill -9 -f [b]in/ros2 2>/dev/null || true
-docker exec isaac_ros_dev_container pkill -9 -f [j]oint_state_publisher 2>/dev/null || true
-docker exec isaac_ros_dev_container pkill -9 -f [w]heeltec_keyboard 2>/dev/null || true
-docker exec isaac_ros_dev_container pkill -9 -f [w]eb_server 2>/dev/null || true
-docker exec isaac_ros_dev_container pkill -9 rviz2 2>/dev/null || true
-sleep 1
+if [ "$SHOULD_CLEAN" == "true" ]; then
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        echo "🧹 偵測到舊的 tmux 會話 '${SESSION_NAME}' 正在運行，正將其關閉..."
+        tmux kill-session -t "$SESSION_NAME"
+    fi
+
+    # 額外清理容器內可能殘留的 ROS 2 與 Python 節點進程 (避免佔用序列埠或 CPU)
+    # 注意：使用 rviz2 (不加 -f) 避免匹配到含 'rviz2' 參數的本腳本名稱，導致腳本被 self-kill
+    echo "🧹 正在清理容器內可能殘留的舊節點進程..."
+    docker exec isaac_ros_dev_container pkill -9 -f [b]ase_control_node 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [b]in/ros2 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [j]oint_state_publisher 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [w]heeltec_keyboard 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [w]eb_server 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 rviz2 2>/dev/null || true
+    sleep 1
+else
+    echo "ℹ️ 跳過清理舊進程與會話 (若要強制清理，請加上 -kill 參數)"
+fi
 
 # 共用指令前綴
 DOCKER_EXEC="docker exec -it isaac_ros_dev_container"
-ROS2_SETUP="source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash"
+ROS2_SETUP="export ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL} && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash"
 
 # ==================== 預設模式 1: teleop ====================
 if [ "$1" == "teleop" ]; then
@@ -164,6 +228,35 @@ if [ "$1" == "web_all" ]; then
     # 回到第一個分頁並選取網頁遙控窗格 (此時索引為 3)
     tmux select-window -t "$SESSION_NAME:0"
     tmux select-pane -t 3
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
+# ==================== 預設模式 4: terminal ====================
+if [ "$1" == "terminal" ]; then
+    echo "🚀 正在啟動包含 ROS 2 環境變數 (ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL}) 的 Docker 互動終端機..."
+    
+    # 檢查會話是否已經存在
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        echo "ℹ️ 偵測到已有運作中的 tmux 會話 '${SESSION_NAME}'，正在新增一個分頁..."
+        # 尋找尚未被佔用的 Terminal-<ID> 視窗名稱
+        ID=1
+        while tmux list-windows -t "$SESSION_NAME" -F "#W" 2>/dev/null | grep -q "^Terminal-${ID}$"; do
+            ID=$((ID + 1))
+        done
+        WINDOW_NAME="Terminal-${ID}"
+
+        # 建立新視窗並啟動進入 Docker 的互動終端機
+        tmux new-window -t "$SESSION_NAME" -n "$WINDOW_NAME"
+        tmux send-keys -t "$SESSION_NAME:$WINDOW_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && exec bash'" C-m
+        tmux select-window -t "$SESSION_NAME:$WINDOW_NAME"
+    else
+        # 建立全新會話
+        WINDOW_NAME="Terminal-1"
+        tmux new-session -d -s "$SESSION_NAME" -n "$WINDOW_NAME"
+        tmux send-keys -t "$SESSION_NAME:0.0" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && exec bash'" C-m
+    fi
+    
     tmux attach-session -t "$SESSION_NAME"
     exit 0
 fi
