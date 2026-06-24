@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thor Robot Portal</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at center, #0d1527 0%, #030712 100%);
+            color: #f3f4f6;
+            overflow: hidden;
+        }
+        .portal-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .portal-header {
+            margin-bottom: 3.5rem;
+        }
+        .portal-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: #ffffff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            margin: 0;
+        }
+        .portal-logo span {
+            color: #06b6d4; /* cyan */
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .portal-subtitle {
+            font-size: 1.1rem;
+            color: #9ca3af;
+            margin-top: 1rem;
+            letter-spacing: 1px;
+            font-weight: 300;
+        }
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 2.5rem;
+            margin-top: 2rem;
+        }
+        .portal-card {
+            background: rgba(30, 41, 59, 0.3);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .portal-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 0 20px 40px rgba(6, 182, 212, 0.15);
+        }
+        .portal-card:hover::before {
+            opacity: 1;
+        }
+        .portal-card.teleop-card:hover {
+            border-color: rgba(168, 85, 247, 0.4); /* purple */
+            box-shadow: 0 20px 40px rgba(168, 85, 247, 0.15);
+        }
+        .card-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            color: #06b6d4;
+            transition: all 0.4s ease;
+        }
+        .teleop-card .card-icon {
+            background: rgba(168, 85, 247, 0.1);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+        }
+        .portal-card:hover .card-icon {
+            transform: scale(1.1);
+            background: #06b6d4;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .portal-card.teleop-card:hover .card-icon {
+            background: #a855f7;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 0 1rem 0;
+            letter-spacing: 1px;
+        }
+        .card-desc {
+            font-size: 0.95rem;
+            color: #9ca3af;
+            line-height: 1.6;
+            margin: 0 0 2rem 0;
+            font-weight: 300;
+        }
+        .enter-btn {
+            padding: 0.75rem 2.5rem;
+            border-radius: 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            background: rgba(6, 182, 212, 0.1);
+            color: #06b6d4;
+            transition: all 0.3s ease;
+        }
+        .teleop-card .enter-btn {
+            border-color: rgba(168, 85, 247, 0.4);
+            background: rgba(168, 85, 247, 0.1);
+            color: #a855f7;
+        }
+        .portal-card:hover .enter-btn {
+            background: #06b6d4;
+            color: #0f172a;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+        }
+        .portal-card.teleop-card:hover .enter-btn {
+            background: #a855f7;
+            color: #0f172a;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="stars-bg"></div>
+    <div class="portal-container">
+        <header class="portal-header">
+            <h1 class="portal-logo"><span>THOR</span> ROBOTICS</h1>
+            <div class="portal-subtitle">INTEGRATED SLAM & NAVIGATION ENVIRONMENT</div>
+        </header>
+
+        <div class="portal-grid">
+            <!-- MANUAL TELEOP CARD -->
+            <a href="/teleop" class="portal-card teleop-card">
+                <div class="card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="12" width="20" height="8" rx="2" ry="2"></rect>
+                        <path d="M12 2v10"></path>
+                        <path d="M12 2l-3 3"></path>
+                        <path d="M12 2l3 3"></path>
+                        <circle cx="6" cy="16" r="1"></circle>
+                        <circle cx="18" cy="16" r="1"></circle>
+                    </svg>
+                </div>
+                <h2 class="card-title">Manual Remote</h2>
+                <p class="card-desc">Control the robot manually using interactive joysticks, D-Pad, or keyboard keys. Monitor SLAM mapping dynamically.</p>
+                <div class="enter-btn">Control Mode</div>
+            </a>
+
+            <!-- AUTONOMOUS EXPLORATION CARD -->
+            <a href="/explorer" class="portal-card">
+                <div class="card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                    </svg>
+                </div>
+                <h2 class="card-title">Auto Explorer</h2>
+                <p class="card-desc">Deploy frontier-based autonomous exploration. Setup target laps, view detected centroids in real-time, and manage map saves.</p>
+                <div class="enter-btn">Explore Mode</div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

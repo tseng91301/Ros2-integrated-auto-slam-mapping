@@ -4,6 +4,8 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import OccupancyGrid
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+from std_msgs.msg import String
+from visualization_msgs.msg import MarkerArray
 import threading
 import tornado.ioloop
 import tornado.web
@@ -17,28 +19,82 @@ import zipfile
 import io
 from PIL import Image
 from ament_index_python.packages import get_package_share_directory
+from slam_toolbox.srv import Reset
 
 # Global variables to store the node and active web socket clients
 ros_node = None
 websocket_clients = set()
 latest_map_data = None  # Cache for map updates
+latest_markers_data = None  # Cache for exploration markers
+latest_status_data = None  # Cache for exploration status
 
 class TeleopNode(Node):
     def __init__(self):
         super().__init__('web_teleop_node')
+        
+        # Publisher for velocity commands (Teleop)
         self.pub = self.create_publisher(Twist, 'cmd_vel', 10)
+        
+        # Subscriber for map updates
         self.sub_map = self.create_subscription(
             OccupancyGrid,
             'map',
             self.map_callback,
             10
         )
+        
+        # Subscriber for frontier centroids and active target coordinates (from auto_explorer)
+        self.sub_markers = self.create_subscription(
+            MarkerArray,
+            '/exploration_markers',
+            self.markers_callback,
+            10
+        )
+        
+        # Publisher for exploration control commands
+        self.explorer_pub = self.create_publisher(
+            String,
+            '/exploration_control',
+            10
+        )
+        
+        # Subscriber for exploration status topic
+        self.sub_status = self.create_subscription(
+            String,
+            '/exploration_status',
+            self.status_callback,
+            10
+        )
+        
         # Transform listener to query robot pose
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        
+        # Create client for slam_toolbox reset service
+        self.reset_cli = self.create_client(Reset, '/slam_toolbox/reset')
+        
         # Create a timer to broadcast robot pose at 10Hz
         self.create_timer(0.1, self.update_robot_pose)
-        self.get_logger().info("Web Teleop ROS 2 Node initialized with TF listener.")
+        
+        self.get_logger().info("Web Teleop & Explorer ROS 2 Node initialized.")
+
+    def call_reset_map(self):
+        if not self.reset_cli.service_is_ready():
+            self.get_logger().warn("SLAM Toolbox reset service not ready. Fallback to CLI subprocess.")
+            cmd = ["ros2", "service", "call", "/slam_toolbox/reset", "slam_toolbox/srv/Reset", "{}"]
+            subprocess.Popen(cmd)
+            return
+        
+        req = Reset.Request()
+        future = self.reset_cli.call_async(req)
+        future.add_done_callback(self.reset_map_done_callback)
+
+    def reset_map_done_callback(self, future):
+        try:
+            future.result()
+            self.get_logger().info("SLAM Toolbox reset service call successful.")
+        except Exception as e:
+            self.get_logger().error(f"SLAM Toolbox reset service call failed: {e}")
 
     def map_callback(self, msg):
         global latest_map_data
@@ -76,10 +132,62 @@ class TeleopNode(Node):
             for client in websocket_clients:
                 try:
                     client.write_message(json.dumps(latest_map_data))
-                except Exception as e:
+                except Exception:
                     pass
         except Exception as e:
             self.get_logger().error(f"Error processing map: {str(e)}")
+
+    def markers_callback(self, msg):
+        """Processes centroids and active exploration targets and sends them to WebSocket clients."""
+        global websocket_clients, latest_markers_data
+        
+        centroids = []
+        target = None
+        
+        for marker in msg.markers:
+            # If marker action is DELETEALL, it indicates map/frontiers are being reset
+            if marker.action == 3:  # DELETEALL
+                continue
+            if marker.ns == "centroids":
+                for pt in marker.points:
+                    centroids.append({"x": pt.x, "y": pt.y})
+            elif marker.ns == "target":
+                target = {"x": marker.pose.position.x, "y": marker.pose.position.y}
+                
+        latest_markers_data = {
+            "type": "exploration_status",
+            "centroids": centroids,
+            "target": target
+        }
+        
+        # Broadcast status to Web clients
+        for client in websocket_clients:
+            try:
+                client.write_message(json.dumps(latest_markers_data))
+            except Exception:
+                pass
+
+    def status_callback(self, msg):
+        """Processes the exploration status and forwards it to WebSocket clients."""
+        global websocket_clients, latest_status_data
+        try:
+            data = json.loads(msg.data)
+            latest_status_data = {
+                "type": "exploration_node_status",
+                "is_paused": data.get("is_paused"),
+                "current_lap": data.get("current_lap"),
+                "max_exploration_laps": data.get("max_exploration_laps"),
+                "exploration_complete": data.get("exploration_complete"),
+                "blacklist_count": data.get("blacklist_count"),
+                "robot_radius": data.get("robot_radius", 0.20)
+            }
+            for client in websocket_clients:
+                try:
+                    client.write_message(json.dumps(latest_status_data))
+                except Exception:
+                    pass
+        except Exception as e:
+            pass
 
     def update_robot_pose(self):
         global websocket_clients
@@ -128,9 +236,20 @@ class TeleopNode(Node):
         twist.angular.z = float(th)
         self.pub.publish(twist)
 
-class MainHandler(tornado.web.RequestHandler):
+class MainPortalHandler(tornado.web.RequestHandler):
+    """Serves the portal page containing choices for Manual Teleop or Auto Exploration."""
     def get(self):
-        self.render("index.html")
+        self.render("portal.html")
+
+class TeleopHandler(tornado.web.RequestHandler):
+    """Serves the Manual Teleop interface."""
+    def get(self):
+        self.render("teleop.html")
+
+class ExplorerHandler(tornado.web.RequestHandler):
+    """Serves the Autonomous Exploration monitor interface."""
+    def get(self):
+        self.render("explorer.html")
 
 class WSHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, origin):
@@ -142,6 +261,12 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         # Immediately send cached map data if available
         if latest_map_data is not None:
             self.write_message(json.dumps(latest_map_data))
+        # Immediately send cached markers data if available
+        if latest_markers_data is not None:
+            self.write_message(json.dumps(latest_markers_data))
+        # Immediately send cached status data if available
+        if latest_status_data is not None:
+            self.write_message(json.dumps(latest_status_data))
 
     def on_message(self, message):
         try:
@@ -162,13 +287,30 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                 
                 # Executing command to save the map
                 cmd = ["ros2", "run", "nav2_map_server", "map_saver_cli", "-f", filepath]
-                subprocess.Popen(cmd) # Run in background so we don't block
+                subprocess.Popen(cmd)  # Run in background so we don't block
                 ros_node.get_logger().info(f"Saving map to {filepath}...")
             elif msg_type == "reset_map":
-                # Call slam_toolbox reset service asynchronously
-                cmd = ["ros2", "service", "call", "/slam_toolbox/reset", "slam_toolbox/srv/Reset", "{}"]
-                subprocess.Popen(cmd)
+                # Clear cached map and markers data immediately
+                global latest_map_data, latest_markers_data
+                latest_map_data = None
+                latest_markers_data = None
+                
+                # Reset exploration node first by publishing reset command
+                msg = String()
+                msg.data = "reset"
+                ros_node.explorer_pub.publish(msg)
+                ros_node.get_logger().info("Sent reset command to exploration node.")
+                
+                # Call slam_toolbox reset service natively
+                ros_node.call_reset_map()
                 ros_node.get_logger().info("Reset map command sent to slam_toolbox.")
+            elif msg_type == "exploration_cmd":
+                # Send control commands to explorer node
+                command = data.get("command")
+                msg = String()
+                msg.data = str(command)
+                ros_node.explorer_pub.publish(msg)
+                ros_node.get_logger().info(f"Published exploration command: '{command}'")
         except Exception as e:
             ros_node.get_logger().error(f"Error handling WS message: {str(e)}")
 
@@ -247,7 +389,9 @@ def main():
     static_path = os.path.join(share_dir, 'static')
     
     app = tornado.web.Application([
-        (r"/", MainHandler),
+        (r"/", MainPortalHandler),
+        (r"/teleop", TeleopHandler),
+        (r"/explorer", ExplorerHandler),
         (r"/ws", WSHandler),
         (r"/api/download_map", DownloadMapHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": static_path}),

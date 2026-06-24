@@ -1,18 +1,18 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>wheeltec_web_teleop</name>
+  <name>auto_explorer</name>
   <version>0.0.1</version>
-  <description>Web Teleop Control package for Wheeltec Robot with Map display</description>
+  <description>Autonomous map exploration package using frontier-based clustering and reactive steering.</description>
   <maintainer email="ubuntu@todo.todo">ubuntu</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
-  <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
-  <depend>visualization_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_ros</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
