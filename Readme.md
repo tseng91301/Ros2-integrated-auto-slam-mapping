@@ -73,6 +73,20 @@ sudo systemctl restart docker
 
 ---
 
+## 📦 ROS 2 Docker 容器內必要 Apt 套件清單
+
+本專案的所有功能包（包含底盤控制、雷達、SLAM、網頁遙控、相機驅動等）在 Docker 容器內編譯與執行時，依賴以下核心套件。若您使用現有或自建的 Docker 容器，請務必手動或透過指令安裝這些相依庫：
+
+- **核心開發工具**：`build-essential`, `python3-colcon-common-extensions`, `python3-rosdep`
+- **底盤序列通訊與 Python**：`python3-serial`, `python3-matplotlib`, `python3-tornado`
+- **相機與圖像傳輸**：`ros-jazzy-librealsense2`, `ros-jazzy-realsense2-camera`, `ros-jazzy-v4l2-camera`, `ros-jazzy-cv-bridge`, `ros-jazzy-theora-image-transport`
+- **導航與 SLAM**：`ros-jazzy-navigation2`, `ros-jazzy-nav2-bringup`, `ros-jazzy-slam-toolbox`
+- **加速與偵測 (NVIDIA Isaac ROS)**：`ros-jazzy-isaac-ros-apriltag`, `ros-jazzy-isaac-ros-common`
+
+詳細的套件說明與一鍵手動安裝指令，請參閱：[Docker 容器啟動與相依套件安裝指南 (isaac_ros_setup.md)](file:///home/ubuntu/workspaces/isaac_ros-dev/isaac_ros_setup.md)。
+
+---
+
 ## 📂 專案目錄結構說明
 
 ```text
