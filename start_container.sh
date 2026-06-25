@@ -20,10 +20,13 @@ args=(
   -e NVIDIA_VISIBLE_DEVICES=all
   -e NVIDIA_DRIVER_CAPABILITIES=all
   -e USER="ubuntu"
+  -e DISPLAY=":0"
   --workdir /workspaces/isaac_ros-dev
   -v "${ISAAC_ROS_WS}:/workspaces/isaac_ros-dev"
   -v /etc/localtime:/etc/localtime:ro
   -v /tmp:/tmp
+  -v /tmp/.X11-unix:/tmp/.X11-unix
+  --gpus all
   --name "${CONTAINER_NAME}"
   --entrypoint /bin/bash
 )
