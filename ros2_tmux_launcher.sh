@@ -254,7 +254,7 @@ if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_expl
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
@@ -283,7 +283,7 @@ if [ "$1" == "sim_keyboard" ]; then
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"

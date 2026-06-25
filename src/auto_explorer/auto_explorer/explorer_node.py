@@ -20,6 +20,7 @@ from std_msgs.msg import String
 from visualization_msgs.msg import Marker, MarkerArray
 from nav2_msgs.action import NavigateToPose
 import tf2_ros
+from auto_explorer.heatmap import HeatmapManager
 
 def normalize_angle(angle):
     """Normalize angle to [-pi, pi]."""
@@ -60,6 +61,10 @@ class AutoExplorerNode(Node):
         self.declare_parameter('thumbtack_spacing', 0.5)   # meters
         self.declare_parameter('local_search_radius', 3.0) # meters
         self.declare_parameter('hysteresis_factor', 1.25)  # threshold factor to switch target sectors
+        self.declare_parameter('sector_lock_cycles', 10)   # minimum cycles to lock onto a sector (at 10Hz, 10 cycles = 1s)
+        self.declare_parameter('stuck_temp_threshold', 80.0) # temperature threshold to trigger recovery
+        self.declare_parameter('heatmap_decay_rate', 0.05)   # decay per cycle (10Hz)
+        self.declare_parameter('heatmap_heat_increment', 2.0) # increment per cycle
         
         # Get parameters
         self.map_frame = self.get_parameter('map_frame').value
@@ -75,6 +80,10 @@ class AutoExplorerNode(Node):
         self.thumbtack_spacing = self.get_parameter('thumbtack_spacing').value
         self.local_search_radius = self.get_parameter('local_search_radius').value
         self.hysteresis_factor = self.get_parameter('hysteresis_factor').value
+        self.sector_lock_cycles = self.get_parameter('sector_lock_cycles').value
+        self.stuck_temp_threshold = self.get_parameter('stuck_temp_threshold').value
+        self.heatmap_decay_rate = self.get_parameter('heatmap_decay_rate').value
+        self.heatmap_heat_increment = self.get_parameter('heatmap_heat_increment').value
         
         self.get_logger().info(
             f"auto_explorer node started with 4-phase algorithm parameters:\n"
@@ -85,7 +94,11 @@ class AutoExplorerNode(Node):
             f"  robot_radius (inflation): {self.robot_radius} m\n"
             f"  thumbtack_spacing: {self.thumbtack_spacing} m\n"
             f"  local_search_radius: {self.local_search_radius} m\n"
-            f"  hysteresis_factor: {self.hysteresis_factor}"
+            f"  hysteresis_factor: {self.hysteresis_factor}\n"
+            f"  sector_lock_cycles: {self.sector_lock_cycles}\n"
+            f"  stuck_temp_threshold: {self.stuck_temp_threshold}\n"
+            f"  heatmap_decay_rate: {self.heatmap_decay_rate}\n"
+            f"  heatmap_heat_increment: {self.heatmap_heat_increment}"
         )
         
         # QoS setup for OccupancyGrid (reliable & transient local)
@@ -122,6 +135,7 @@ class AutoExplorerNode(Node):
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.marker_pub = self.create_publisher(MarkerArray, '/exploration_markers', 10)
         self.status_pub = self.create_publisher(String, '/exploration_status', 10)
+        self.heatmap_pub = self.create_publisher(OccupancyGrid, '/heatmap', map_qos)
         
         # Nav2 action client
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
@@ -137,6 +151,15 @@ class AutoExplorerNode(Node):
         self.current_target = None
         self.active_sector = None
         self.active_sector_weight = 0
+        self.active_sector_cycles = 0
+        self.is_recovering = False
+        
+        # Heatmap Manager
+        self.heatmap_manager = HeatmapManager(
+            decay_rate=self.heatmap_decay_rate,
+            heat_increment=self.heatmap_heat_increment,
+            robot_radius_m=self.robot_radius
+        )
         
         # Navigating state for Phase 3
         self.is_navigating = False
@@ -285,6 +308,9 @@ class AutoExplorerNode(Node):
             self.state = 'INIT'
             self.active_sector = None
             self.active_sector_weight = 0
+            self.active_sector_cycles = 0
+            self.is_recovering = False
+            self.heatmap_manager.reset()
             self.cancel_nav_goal()
             self.stop_robot()
             self.get_logger().info("Exploration Reset.")
@@ -306,7 +332,8 @@ class AutoExplorerNode(Node):
                 "max_exploration_laps": self.max_exploration_laps,
                 "exploration_complete": self.exploration_complete,
                 "blacklist_count": len(self.thumbtack_pool),  # mapped to pool size for UI count
-                "robot_radius": self.robot_radius
+                "robot_radius": self.robot_radius,
+                "is_recovering": self.is_recovering
             }
             msg = String()
             msg.data = json.dumps(status_json)
@@ -357,6 +384,15 @@ class AutoExplorerNode(Node):
         if not thumbtack_grids:
             return None, None
 
+        # Filter to only keep cool thumbtacks if possible (temp < 50% of threshold)
+        cool_thumbtack_grids = {
+            tg: val for tg, val in thumbtack_grids.items()
+            if self.heatmap_manager.get_temperature(val[0], val[1]) < (self.stuck_temp_threshold * 0.5)
+        }
+        
+        # If we have cool thumbtacks, target those. Otherwise fallback to all thumbtacks.
+        active_thumbtack_grids = cool_thumbtack_grids if cool_thumbtack_grids else thumbtack_grids
+
         # Load occupancy data as 2D numpy array
         map_np = np.array(data, dtype=np.int8).reshape((height, width))
 
@@ -398,7 +434,7 @@ class AutoExplorerNode(Node):
 
             while queue:
                 curr = queue.popleft()
-                if curr in thumbtack_grids:
+                if curr in active_thumbtack_grids:
                     found_tg = curr
                     break
 
@@ -423,7 +459,7 @@ class AutoExplorerNode(Node):
                     path.append(grid_to_world(curr[0], curr[1]))
                     curr = parent[curr]
                 path.reverse()
-                return thumbtack_grids[found_tg], path
+                return active_thumbtack_grids[found_tg], path
 
         return None, None
 
@@ -470,6 +506,8 @@ class AutoExplorerNode(Node):
             self.current_target = None
             self.active_sector = None
             self.active_sector_weight = 0
+            self.active_sector_cycles = 0
+            self.is_recovering = False
             self.state = 'EXPLORE'
 
     def control_loop(self):
@@ -525,6 +563,15 @@ class AutoExplorerNode(Node):
         origin_x = grid.info.origin.position.x
         origin_y = grid.info.origin.position.y
         data = grid.data
+        
+        # Update and decay heatmap
+        self.heatmap_manager.update_map_size(width, height, resolution, origin_x, origin_y)
+        self.heatmap_manager.add_heat(robot_x, robot_y)
+        self.heatmap_manager.decay()
+        
+        # Publish heatmap grid
+        heatmap_msg = self.heatmap_manager.generate_occupancy_grid(grid.header)
+        self.heatmap_pub.publish(heatmap_msg)
         
         map_np = np.array(data, dtype=np.int8).reshape((height, width))
         
@@ -593,6 +640,23 @@ class AutoExplorerNode(Node):
                     
         max_weight = max(weights)
 
+        # Heatmap stuck recovery check
+        current_temp = self.heatmap_manager.get_temperature(robot_x, robot_y)
+        if self.state == 'EXPLORE' and current_temp >= self.stuck_temp_threshold:
+            self.get_logger().warn(
+                f"🔥 Robot stuck detected! Heatmap temperature at robot position is {current_temp:.2f} "
+                f"(threshold: {self.stuck_temp_threshold}). Forcing transition to BACKTRACK (Phase 3) recovery...",
+            )
+            self.state = 'BACKTRACK'
+            self.stop_robot()
+            self.is_navigating = False
+            self.backtrack_target = None
+            self.current_target = None
+            self.active_sector = None
+            self.active_sector_weight = 0
+            self.active_sector_cycles = 0
+            self.is_recovering = True
+
         # STATE MACHINE STATE HANDLING
         if self.state == 'INIT':
             self.stop_robot()
@@ -608,6 +672,7 @@ class AutoExplorerNode(Node):
                 self.current_target = None
                 self.active_sector = None
                 self.active_sector_weight = 0
+                self.active_sector_cycles = 0
                 self.get_logger().info("Dead end reached (all sector weights are 0). Switching to Phase 3 (Backtracking)...")
             else:
                 # Phase 2: Local steer and drive with target hysteresis
@@ -615,12 +680,21 @@ class AutoExplorerNode(Node):
                 if (self.active_sector is not None 
                         and not sector_blocked[self.active_sector] 
                         and weights[self.active_sector] > 0):
-                    # Stick to current sector unless max_weight is significantly higher
-                    hysteresis_threshold = int(weights[self.active_sector] * self.hysteresis_factor)
-                    if max_weight > hysteresis_threshold:
-                        use_active = False
-                    else:
+                    
+                    self.active_sector_cycles += 1
+                    
+                    # If we haven't reached the lock duration, stick to the active sector
+                    if self.active_sector_cycles < self.sector_lock_cycles:
                         use_active = True
+                    else:
+                        # Beyond lock duration: stick to it unless max_weight is significantly higher
+                        hysteresis_threshold = int(weights[self.active_sector] * self.hysteresis_factor)
+                        if max_weight > hysteresis_threshold:
+                            use_active = False
+                        else:
+                            use_active = True
+                else:
+                    use_active = False
 
                 if use_active:
                     k_target = self.active_sector
@@ -631,10 +705,11 @@ class AutoExplorerNode(Node):
                     if k_target != self.active_sector:
                         self.get_logger().info(
                             f"Sector switched: {self.active_sector} (weight {self.active_sector_weight}) -> "
-                            f"{k_target} (weight {max_weight})"
+                            f"{k_target} (weight {max_weight}) after {self.active_sector_cycles} cycles"
                         )
                     self.active_sector = k_target
                     self.active_sector_weight = max_weight
+                    self.active_sector_cycles = 0
                 
                 # Target center local angle
                 phi = (k_target * 30.0 - 180.0 + 15.0) * math.pi / 180.0
@@ -682,12 +757,13 @@ class AutoExplorerNode(Node):
                             
         elif self.state == 'BACKTRACK':
             # Phase 3 Re-takeover Check: if we detect unknown space nearby again, hand back control to Phase 2
-            if max_weight > 0:
+            if not self.is_recovering and max_weight > 0:
                 self.get_logger().info("Sectors re-detected unknown cells nearby. Re-taking control (returning to Phase 2)...")
                 self.cancel_nav_goal()
                 self.state = 'EXPLORE'
                 self.active_sector = None
                 self.active_sector_weight = 0
+                self.active_sector_cycles = 0
                 return
                 
             # If we reached the backtracking target, cancel and return to Phase 2
@@ -699,6 +775,8 @@ class AutoExplorerNode(Node):
                     self.state = 'EXPLORE'
                     self.active_sector = None
                     self.active_sector_weight = 0
+                    self.active_sector_cycles = 0
+                    self.is_recovering = False
                     return
                     
             # If not currently navigating, search for nearest thumbtack

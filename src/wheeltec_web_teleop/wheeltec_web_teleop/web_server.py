@@ -67,6 +67,15 @@ class TeleopNode(Node):
             10
         )
         
+        # Subscriber for heatmap updates
+        self.latest_heatmap = None
+        self.sub_heatmap = self.create_subscription(
+            OccupancyGrid,
+            '/heatmap',
+            self.heatmap_callback,
+            10
+        )
+        
         # Subscriber for frontier centroids and active target coordinates (from auto_explorer)
         self.sub_markers = self.create_subscription(
             MarkerArray,
@@ -178,7 +187,26 @@ class TeleopNode(Node):
             # 100 (occupied) -> 0
             # -1 (unknown) -> 127
             pixels = np.full(grid_arr.shape, 127, dtype=np.uint8)
-            pixels[grid_arr == 0] = 255
+            
+            # Blend heatmap into free space pixels
+            free_mask = (grid_arr == 0)
+            
+            if (self.latest_heatmap is not None 
+                    and self.latest_heatmap.info.width == width 
+                    and self.latest_heatmap.info.height == height):
+                # Load heatmap data
+                heat_arr = np.array(self.latest_heatmap.data, dtype=np.int8)
+                temp_scaled = (heat_arr * 2.5).astype(np.uint8)
+                temp_scaled = np.clip(temp_scaled, 1, 254)
+                
+                # Apply heat values to free cells
+                has_heat = (heat_arr > 0)
+                pixels[free_mask] = 255
+                heat_free_mask = free_mask & has_heat
+                pixels[heat_free_mask] = temp_scaled[heat_free_mask]
+            else:
+                pixels[free_mask] = 255
+                
             pixels[grid_arr == 100] = 0
             
             # Base64 encode
@@ -198,6 +226,9 @@ class TeleopNode(Node):
             safe_broadcast(latest_map_data)
         except Exception as e:
             self.get_logger().error(f"Error processing map: {str(e)}")
+
+    def heatmap_callback(self, msg):
+        self.latest_heatmap = msg
 
     def markers_callback(self, msg):
         """Processes centroids and active exploration targets and sends them to WebSocket clients."""
@@ -237,7 +268,8 @@ class TeleopNode(Node):
                 "max_exploration_laps": data.get("max_exploration_laps"),
                 "exploration_complete": data.get("exploration_complete"),
                 "blacklist_count": data.get("blacklist_count"),
-                "robot_radius": data.get("robot_radius", 0.20)
+                "robot_radius": data.get("robot_radius", 0.20),
+                "is_recovering": data.get("is_recovering", False)
             }
             safe_broadcast(latest_status_data)
         except Exception as e:

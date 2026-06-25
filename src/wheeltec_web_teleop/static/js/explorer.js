@@ -102,11 +102,16 @@
                     currentLap = msg.current_lap;
                     maxExplorationLaps = msg.max_exploration_laps;
                     explorationComplete = msg.exploration_complete;
+                    const isRecovering = msg.is_recovering || false;
+
                     if (msg.robot_radius !== undefined) {
                         robotRadiusM = msg.robot_radius;
                         if (mapCanvas) {
                             mapCanvas.options.robotRadiusM = robotRadiusM;
                         }
+                    }
+                    if (mapCanvas) {
+                        mapCanvas.isRecovering = isRecovering;
                     }
 
                     // Update lapInput value to match the node parameter dynamically
@@ -116,6 +121,9 @@
                     if (explorationComplete) {
                         valStatus.textContent = 'COMPLETE';
                         valStatus.className = 'tel-value text-cyan';
+                    } else if (isRecovering) {
+                        valStatus.textContent = 'RECOVERING';
+                        valStatus.className = 'tel-value text-amber';
                     } else if (isPaused) {
                         valStatus.textContent = 'PAUSED';
                         valStatus.className = 'tel-value';

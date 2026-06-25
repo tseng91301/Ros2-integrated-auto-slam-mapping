@@ -2,6 +2,28 @@
 // Reusable and Generic Canvas Controller for Map & Robot Visualization in ROS 2.
 
 class MapCanvas {
+    static hslToRgb(h, s, l) {
+        let r, g, b;
+        if (s === 0) {
+            r = g = b = l; // achromatic
+        } else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p + (q - p) * 6 * t;
+                if (t < 1/2) return q;
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255];
+    }
+
     constructor(canvasId, options = {}) {
         this.canvas = document.getElementById(canvasId);
         if (!this.canvas) {
@@ -112,8 +134,23 @@ class MapCanvas {
                     color = this.options.unknownColor;
                 } else if (val === 255) {
                     color = this.options.freeColor;
-                } else {
+                } else if (val === 0) {
                     color = this.options.obstacleColor;
+                } else {
+                    // Temperature value between 1 and 254
+                    const t_factor = val / 254.0;
+                    // HSL: from 240 (blue) for low heat to 0 (red) for high heat
+                    const hue = (1.0 - t_factor) * 240;
+                    const rgb = MapCanvas.hslToRgb(hue / 360, 1.0, 0.5);
+                    
+                    // Blend rgb with freeColor based on t_factor
+                    const bg = this.options.freeColor;
+                    color = [
+                        Math.round(bg[0] + (rgb[0] - bg[0]) * t_factor),
+                        Math.round(bg[1] + (rgb[1] - bg[1]) * t_factor),
+                        Math.round(bg[2] + (rgb[2] - bg[2]) * t_factor),
+                        255
+                    ];
                 }
                 
                 imgData.data[canvas_idx]     = color[0];
@@ -282,14 +319,14 @@ class MapCanvas {
             const pulse = (12 + Math.sin(Date.now() / 150) * 4) / this.zoom;
             this.ctx.beginPath();
             this.ctx.arc(tx, ty, pulse, 0, 2 * Math.PI);
-            this.ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+            this.ctx.strokeStyle = this.isRecovering ? 'rgba(244, 63, 94, 0.5)' : 'rgba(6, 182, 212, 0.5)';
             this.ctx.lineWidth = 2 / this.zoom;
             this.ctx.stroke();
             
             // Center ring
             this.ctx.beginPath();
             this.ctx.arc(tx, ty, 8 / this.zoom, 0, 2 * Math.PI);
-            this.ctx.strokeStyle = '#06b6d4';
+            this.ctx.strokeStyle = this.isRecovering ? '#f43f5e' : '#06b6d4';
             this.ctx.lineWidth = 2 / this.zoom;
             this.ctx.stroke();
             
@@ -299,7 +336,7 @@ class MapCanvas {
             this.ctx.lineTo(tx + 14 / this.zoom, ty);
             this.ctx.moveTo(tx, ty - 14 / this.zoom);
             this.ctx.lineTo(tx, ty + 14 / this.zoom);
-            this.ctx.strokeStyle = '#06b6d4';
+            this.ctx.strokeStyle = this.isRecovering ? '#f43f5e' : '#06b6d4';
             this.ctx.lineWidth = 1.5 / this.zoom;
             this.ctx.stroke();
         }

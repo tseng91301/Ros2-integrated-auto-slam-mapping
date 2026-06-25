@@ -47,8 +47,24 @@ def generate_launch_description():
         description='Radius for local sector search (m)'
     )
     hysteresis_factor_arg = DeclareLaunchArgument(
-        'hysteresis_factor', default_value='100.0',
+        'hysteresis_factor', default_value='1.25',
         description='Weight hysteresis factor to prevent sector switching oscillations'
+    )
+    sector_lock_cycles_arg = DeclareLaunchArgument(
+        'sector_lock_cycles', default_value='10',
+        description='Minimum cycles to lock onto a sector (at 10Hz, 10 cycles = 1s)'
+    )
+    stuck_temp_threshold_arg = DeclareLaunchArgument(
+        'stuck_temp_threshold', default_value='80.0',
+        description='Heatmap temperature threshold to trigger recovery mode'
+    )
+    heatmap_decay_rate_arg = DeclareLaunchArgument(
+        'heatmap_decay_rate', default_value='0.05',
+        description='Heatmap cooling decay per control loop cycle'
+    )
+    heatmap_heat_increment_arg = DeclareLaunchArgument(
+        'heatmap_heat_increment', default_value='2.0',
+        description='Heatmap increment added per cycle at robot position'
     )
 
     # Explorer node
@@ -69,6 +85,10 @@ def generate_launch_description():
             'thumbtack_spacing': LaunchConfiguration('thumbtack_spacing'),
             'local_search_radius': LaunchConfiguration('local_search_radius'),
             'hysteresis_factor': LaunchConfiguration('hysteresis_factor'),
+            'sector_lock_cycles': LaunchConfiguration('sector_lock_cycles'),
+            'stuck_temp_threshold': LaunchConfiguration('stuck_temp_threshold'),
+            'heatmap_decay_rate': LaunchConfiguration('heatmap_decay_rate'),
+            'heatmap_heat_increment': LaunchConfiguration('heatmap_heat_increment'),
         }]
     )
 
@@ -84,5 +104,9 @@ def generate_launch_description():
         thumbtack_spacing_arg,
         local_search_radius_arg,
         hysteresis_factor_arg,
+        sector_lock_cycles_arg,
+        stuck_temp_threshold_arg,
+        heatmap_decay_rate_arg,
+        heatmap_heat_increment_arg,
         explorer_node
     ])
