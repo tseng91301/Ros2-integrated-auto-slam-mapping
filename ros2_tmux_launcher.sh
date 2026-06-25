@@ -7,6 +7,12 @@ SESSION_NAME="ros2_dev"
 # 預設 ROS_DOMAIN_ID
 ROS_DOMAIN_ID_VAL="55"
 
+# 預設模擬器地圖路徑 (Gazebo Simulation World Path)
+# 預設使用優化後免連網下載 Fuel 資源的本地 Warehouse 地圖
+# 若要切換成系統預設的 Sandbox 地圖，可改為空值，或指定 "/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"
+# SIM_WORLD_PATH="/workspaces/isaac_ros-dev/src/auto_explorer/config/warehouse_local.sdf"
+SIM_WORLD_PATH="/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"
+
 # 解析自定義參數與選項
 FORCE_KILL="false"
 NEW_ARGS=()
@@ -254,7 +260,7 @@ if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_expl
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
@@ -283,7 +289,7 @@ if [ "$1" == "sim_keyboard" ]; then
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
