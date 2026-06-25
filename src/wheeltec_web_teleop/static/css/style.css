@@ -1108,3 +1108,73 @@ input:checked + .slider:before {
         height: 60px;
     }
 }
+
+/* Home button inside HUD */
+.hud-home-btn {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    background: rgba(6, 182, 212, 0.05);
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.05);
+}
+
+.hud-home-btn:hover {
+    background: var(--neon-cyan);
+    color: #0f172a;
+    box-shadow: 0 0 15px var(--neon-cyan-glow);
+    border-color: var(--neon-cyan);
+}
+
+/* Collision HUD Alert */
+.hud-collision-alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--stop-red);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--stop-red);
+    text-shadow: 0 0 8px var(--stop-red-glow);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+    animation: collision-flash-pulse 1s infinite alternate;
+}
+
+.hud-collision-alert.hidden {
+    display: none;
+}
+
+.alert-icon {
+    font-size: 0.9rem;
+}
+
+.alert-sectors {
+    font-size: 0.7rem;
+    color: #fca5a5;
+    margin-left: 4px;
+}
+
+/* Flashing effect for collision text/border */
+@keyframes collision-flash-pulse {
+    0% { opacity: 0.6; box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
+    100% { opacity: 1; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+}
+
+/* Red flashing border for monitor screen when robot is in collision */
+.collision-flash {
+    border-color: var(--stop-red) !important;
+    box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.4), 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}

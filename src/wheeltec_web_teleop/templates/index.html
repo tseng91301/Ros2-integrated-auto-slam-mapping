@@ -2,281 +2,215 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Thor Robot Controller</title>
-    <!-- Google Fonts for premium futuristic aesthetics -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thor Robot Portal</title>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at center, #0d1527 0%, #030712 100%);
+            color: #f3f4f6;
+            overflow: hidden;
+        }
+        .portal-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .portal-header {
+            margin-bottom: 3.5rem;
+        }
+        .portal-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: #ffffff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            margin: 0;
+        }
+        .portal-logo span {
+            color: #06b6d4; /* cyan */
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .portal-subtitle {
+            font-size: 1.1rem;
+            color: #9ca3af;
+            margin-top: 1rem;
+            letter-spacing: 1px;
+            font-weight: 300;
+        }
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 2.5rem;
+            margin-top: 2rem;
+        }
+        .portal-card {
+            background: rgba(30, 41, 59, 0.3);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .portal-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 0 20px 40px rgba(6, 182, 212, 0.15);
+        }
+        .portal-card:hover::before {
+            opacity: 1;
+        }
+        .portal-card.teleop-card:hover {
+            border-color: rgba(168, 85, 247, 0.4); /* purple */
+            box-shadow: 0 20px 40px rgba(168, 85, 247, 0.15);
+        }
+        .card-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            color: #06b6d4;
+            transition: all 0.4s ease;
+        }
+        .teleop-card .card-icon {
+            background: rgba(168, 85, 247, 0.1);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+        }
+        .portal-card:hover .card-icon {
+            transform: scale(1.1);
+            background: #06b6d4;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .portal-card.teleop-card:hover .card-icon {
+            background: #a855f7;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 0 1rem 0;
+            letter-spacing: 1px;
+        }
+        .card-desc {
+            font-size: 0.95rem;
+            color: #9ca3af;
+            line-height: 1.6;
+            margin: 0 0 2rem 0;
+            font-weight: 300;
+        }
+        .enter-btn {
+            padding: 0.75rem 2.5rem;
+            border-radius: 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            background: rgba(6, 182, 212, 0.1);
+            color: #06b6d4;
+            transition: all 0.3s ease;
+        }
+        .teleop-card .enter-btn {
+            border-color: rgba(168, 85, 247, 0.4);
+            background: rgba(168, 85, 247, 0.1);
+            color: #a855f7;
+        }
+        .portal-card:hover .enter-btn {
+            background: #06b6d4;
+            color: #0f172a;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+        }
+        .portal-card.teleop-card:hover .enter-btn {
+            background: #a855f7;
+            color: #0f172a;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+        }
+    </style>
 </head>
 <body>
     <div class="stars-bg"></div>
-    
-    <div class="app-container">
-        <!-- HEADER / TELEMETRY HUD -->
-        <header class="hud-header">
-            <div class="hud-logo">
-                <span class="logo-accent">THOR</span> REMOTE
-            </div>
-            
-            <div class="hud-telemetry">
-                <div class="tel-item">
-                    <span class="tel-label">LINEAR VEL:</span>
-                    <span class="tel-value" id="val-vx">0.00 m/s</span>
-                </div>
-                <div class="tel-item">
-                    <span class="tel-label">ANGULAR VEL:</span>
-                    <span class="tel-value" id="val-wz">0.00 rad/s</span>
-                </div>
-                <div class="tel-item">
-                    <span class="tel-label">MAX LINEAR:</span>
-                    <span class="tel-value text-cyan" id="val-limit-linear">0.50 m/s</span>
-                </div>
-                <div class="tel-item">
-                    <span class="tel-label">MAX ANGULAR:</span>
-                    <span class="tel-value text-purple" id="val-limit-angular">1.00 rad/s</span>
-                </div>
-            </div>
-
-            <div class="hud-status">
-                <div class="status-indicator offline" id="status-dot"></div>
-                <span class="status-text" id="status-text">OFFLINE</span>
-            </div>
+    <div class="portal-container">
+        <header class="portal-header">
+            <h1 class="portal-logo"><span>THOR</span> ROBOTICS</h1>
+            <div class="portal-subtitle">INTEGRATED SLAM & NAVIGATION ENVIRONMENT</div>
         </header>
 
-        <!-- MAIN DUAL-GRIP PANEL -->
-        <main class="remote-grid">
-            <!-- LEFT GRIP (LINEAR CONTROLLER) -->
-            <section class="grip-panel left-grip">
-                <div class="grip-header">
-                    <h2>LINEAR CONTROL</h2>
-                    <div class="control-switch-container">
-                        <label class="switch-label">JOYSTICK</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-left-control">
-                            <span class="slider"></span>
-                        </label>
-                        <label class="switch-label">D-PAD</label>
-                    </div>
+        <div class="portal-grid">
+            <!-- MANUAL TELEOP CARD -->
+            <a href="/teleop" class="portal-card teleop-card">
+                <div class="card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="12" width="20" height="8" rx="2" ry="2"></rect>
+                        <path d="M12 2v10"></path>
+                        <path d="M12 2l-3 3"></path>
+                        <path d="M12 2l3 3"></path>
+                        <circle cx="6" cy="16" r="1"></circle>
+                        <circle cx="18" cy="16" r="1"></circle>
+                    </svg>
                 </div>
+                <h2 class="card-title">Manual Remote</h2>
+                <p class="card-desc">Control the robot manually using interactive joysticks, D-Pad, or keyboard keys. Monitor SLAM mapping dynamically.</p>
+                <div class="enter-btn">Control Mode</div>
+            </a>
 
-                <div class="controller-viewport">
-                    <!-- Joystick Container -->
-                    <div class="joystick-wrapper" id="left-joystick-container">
-                        <div class="joystick-ring">
-                            <div class="joystick-handle" id="left-joystick-handle"></div>
-                            <div class="axis-guide x-axis"></div>
-                            <div class="axis-guide y-axis"></div>
-                        </div>
-                    </div>
-
-                    <!-- Button D-Pad Container (Hidden by default) -->
-                    <div class="dpad-wrapper hidden" id="left-dpad">
-                        <div class="dpad-grid">
-                            <div></div>
-                            <button class="dpad-btn btn-up" id="btn-linear-forward" title="Forward">
-                                <svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5z"/></svg>
-                            </button>
-                            <div></div>
-                            
-                            <button class="dpad-btn btn-left" id="btn-linear-left" title="Strafe Left">
-                                <svg viewBox="0 0 24 24"><path d="M14 7l-5 5 5 5z"/></svg>
-                            </button>
-                            <button class="dpad-btn btn-center" id="btn-linear-stop" title="Stop">
-                                <div class="stop-inner"></div>
-                            </button>
-                            <button class="dpad-btn btn-right" id="btn-linear-right" title="Strafe Right">
-                                <svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5z"/></svg>
-                            </button>
-                            
-                            <div></div>
-                            <button class="dpad-btn btn-down" id="btn-linear-backward" title="Backward">
-                                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-                            </button>
-                            <div></div>
-                        </div>
-                    </div>
+            <!-- AUTONOMOUS EXPLORATION CARD -->
+            <a href="/explorer" class="portal-card">
+                <div class="card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                    </svg>
                 </div>
-                <div class="grip-footer">
-                    <span class="sub-label" id="left-mode-indicator">Mode: Non-Holonomic</span>
-                </div>
-            </section>
-
-            <!-- CENTER MONITOR (MAP SCREEN) -->
-            <section class="monitor-panel">
-                <div class="monitor-screen">
-                    <div class="scanlines"></div>
-                    <div class="monitor-header-bar">
-                        <span class="terminal-text">SYS.MAP.ACTIVE - SLA_TOOLBOX</span>
-                        <div class="monitor-resolution" id="map-telemetry">Map: Waiting...</div>
-                    </div>
-                    
-                    <div class="map-container">
-                        <canvas id="map-canvas" width="400" height="400"></canvas>
-                        <div class="map-overlay-grid"></div>
-                        <div class="map-controls">
-                            <button class="map-ctrl-btn" id="btn-zoom-in" title="Zoom In">+</button>
-                            <button class="map-ctrl-btn" id="btn-zoom-out" title="Zoom Out">-</button>
-                            <button class="map-ctrl-btn" id="btn-zoom-reset" title="Reset View">⟲</button>
-                        </div>
-                        <div class="map-loading" id="map-placeholder">
-                            <div class="radar-sweep"></div>
-                            <span class="pulse-text">CONNECTING TO ROS2 MAP DATA...</span>
-                        </div>
-                    </div>
-
-                    <div class="monitor-actions">
-                        <button class="action-btn" id="btn-save-robot" title="Save map on robot storage">
-                            <svg viewBox="0 0 24 24" class="icon"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-                            SAVE MAP
-                        </button>
-                        <button class="action-btn btn-danger-hover" id="btn-reset-map" title="Reset SLAM mapping database">
-                            <svg viewBox="0 0 24 24" class="icon"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                            RESET MAP
-                        </button>
-                        <button class="action-btn" id="btn-download-png" title="Download map as PNG file">
-                            <svg viewBox="0 0 24 24" class="icon"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-                            DOWNLOAD PNG
-                        </button>
-                        <button class="action-btn" id="btn-download-ros" title="Download ROS Map configuration ZIP">
-                            <svg viewBox="0 0 24 24" class="icon"><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 10H8v-2h6v2zm4-4H8v-2h10v2z"/></svg>
-                            DOWNLOAD ROS
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- RIGHT GRIP (ANGULAR CONTROLLER) -->
-            <section class="grip-panel right-grip">
-                <div class="grip-header">
-                    <h2>ANGULAR CONTROL</h2>
-                    <div class="control-switch-container">
-                        <label class="switch-label">JOYSTICK</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-right-control">
-                            <span class="slider"></span>
-                        </label>
-                        <label class="switch-label">D-PAD</label>
-                    </div>
-                </div>
-
-                <div class="controller-viewport">
-                    <!-- Joystick Container -->
-                    <div class="joystick-wrapper" id="right-joystick-container">
-                        <div class="joystick-ring">
-                            <div class="joystick-handle" id="right-joystick-handle"></div>
-                            <div class="axis-guide x-axis"></div>
-                            <div class="axis-guide y-axis"></div>
-                        </div>
-                    </div>
-
-                    <!-- Button D-Pad Container (Hidden by default) -->
-                    <div class="dpad-wrapper hidden" id="right-dpad">
-                        <div class="dpad-grid">
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                            
-                            <button class="dpad-btn btn-left" id="btn-turn-left" title="Rotate Left">
-                                <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
-                            </button>
-                            <button class="dpad-btn btn-center" id="btn-angular-stop" title="Stop rotation">
-                                <div class="stop-inner"></div>
-                            </button>
-                            <button class="dpad-btn btn-right" id="btn-turn-right" title="Rotate Right">
-                                <svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
-                            </button>
-                            
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="grip-footer">
-                    <span class="sub-label">Yaw Steering Mode</span>
-                </div>
-            </section>
-        </main>
-
-        <!-- SETTINGS / EXTRA CONFIGURE SECTION -->
-        <footer class="control-footer">
-            <div class="footer-card card-sliders">
-                <h3>SPEED LIMIT MULTIPLIER</h3>
-                <div class="slider-row">
-                    <label>LINEAR (X/Y)</label>
-                    <input type="range" id="slider-linear" min="0.1" max="1.5" step="0.05" value="0.5">
-                    <span class="slider-val" id="val-slider-linear">0.50</span>
-                </div>
-                <div class="slider-row">
-                    <label>ANGULAR (Z)</label>
-                    <input type="range" id="slider-angular" min="0.1" max="2.5" step="0.05" value="1.0">
-                    <span class="slider-val" id="val-slider-angular">1.00</span>
-                </div>
-            </div>
-
-            <div class="footer-card card-modes">
-                <h3>DRIVE MODE</h3>
-                <div class="mode-toggles">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="check-holonomic">
-                        <span class="checkmark"></span>
-                        Enable Holonomic Mode (Strafing)
-                    </label>
-                </div>
-                <div class="help-section">
-                    <span class="help-toggle" id="help-toggle">⌨️ Keyboard Control Help</span>
-                </div>
-            </div>
-
-            <div class="footer-card card-estop">
-                <button class="estop-btn" id="btn-estop">
-                    <span>EMERGENCY</span>
-                    <span>STOP</span>
-                </button>
-            </div>
-        </footer>
-    </div>
-
-    <!-- Keyboard help modal -->
-    <div class="modal-overlay hidden" id="help-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Keyboard Remote Guidelines</h2>
-                <button class="close-btn" id="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="kbd-layout">
-                    <div class="kbd-row">
-                        <span class="kbd-key">U</span>
-                        <span class="kbd-key">I</span>
-                        <span class="kbd-key">O</span>
-                    </div>
-                    <div class="kbd-row">
-                        <span class="kbd-key">J</span>
-                        <span class="kbd-key">K</span>
-                        <span class="kbd-key">L</span>
-                    </div>
-                    <div class="kbd-row">
-                        <span class="kbd-key">M</span>
-                        <span class="kbd-key">,</span>
-                        <span class="kbd-key">.</span>
-                    </div>
-                </div>
-                <div class="kbd-details">
-                    <p><strong>I / ,</strong> : Forward / Backward</p>
-                    <p><strong>J / L</strong> : Rotate Left / Rotate Right</p>
-                    <p><strong>U / O</strong> : Curved Forward-Left / Forward-Right</p>
-                    <p><strong>M / .</strong> : Curved Backward-Left / Backward-Right</p>
-                    <p><strong>K or Space</strong> : Immediate STOP</p>
-                    <hr>
-                    <p><strong>Shift + Keyboard (U, I, O, J, L, M, &lt;, &gt;)</strong> : Holonomic slide mode (strafing lateral movement instead of rotating)</p>
-                </div>
-            </div>
+                <h2 class="card-title">Auto Explorer</h2>
+                <p class="card-desc">Deploy frontier-based autonomous exploration. Setup target laps, view detected centroids in real-time, and manage map saves.</p>
+                <div class="enter-btn">Explore Mode</div>
+            </a>
         </div>
     </div>
-    
-    <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -72,6 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapPlaceholder = document.getElementById('map-placeholder');
     const mapTelemetry = document.getElementById('map-telemetry');
     
+    // Collision elements
+    const collisionAlert = document.getElementById('collision-alert');
+    const collisionSectors = document.getElementById('collision-sectors');
+    const monitorScreen = document.querySelector('.monitor-screen');
+    
     // Grips switches
     const toggleLeft = document.getElementById('toggle-left-control');
     const leftJoystickContainer = document.getElementById('left-joystick-container');
@@ -137,11 +142,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     robotPose.yaw = msg.yaw;
                     robotPose.active = true;
                     draw();
+                } else if (msg.type === 'collision') {
+                    handleCollisionAlert(msg);
                 }
             } catch (e) {
                 console.error('Error parsing WS message:', e);
             }
         };
+    }
+
+    // Collision Alert Handler
+    function handleCollisionAlert(msg) {
+        if (!collisionAlert || !collisionSectors) return;
+        if (msg.collision) {
+            collisionAlert.classList.remove('hidden');
+            let sectors = [];
+            if (msg.front) sectors.push('FRONT');
+            if (msg.rear) sectors.push('REAR');
+            if (msg.left) sectors.push('LEFT');
+            if (msg.right) sectors.push('RIGHT');
+            collisionSectors.textContent = `[${sectors.join(', ')}]`;
+            
+            if (monitorScreen) {
+                monitorScreen.classList.add('collision-flash');
+            }
+        } else {
+            collisionAlert.classList.add('hidden');
+            collisionSectors.textContent = '';
+            if (monitorScreen) {
+                monitorScreen.classList.remove('collision-flash');
+            }
+        }
     }
 
     // MAP PROCESSING

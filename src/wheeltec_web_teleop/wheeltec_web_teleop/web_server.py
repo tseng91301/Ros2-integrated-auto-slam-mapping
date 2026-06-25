@@ -108,6 +108,49 @@ class TeleopNode(Node):
 
     def scan_callback(self, msg):
         self.latest_scan = msg
+        try:
+            ranges = np.array(msg.ranges)
+            # Replace inf/nan with large numbers
+            ranges = np.nan_to_num(ranges, nan=10.0, posinf=10.0, neginf=10.0)
+            
+            num_readings = len(ranges)
+            if num_readings > 0:
+                angles = msg.angle_min + np.arange(num_readings) * msg.angle_increment
+                # Normalize angles to [-pi, pi]
+                angles = (angles + np.pi) % (2 * np.pi) - np.pi
+                
+                # Obstacle threshold distance (0.35m)
+                threshold = 0.35
+                
+                # Sectors:
+                # Front sector: |angle| < 45 deg (pi/4)
+                front_mask = (np.abs(angles) < np.pi / 4) & (ranges < threshold)
+                # Rear sector: |angle| > 135 deg (3*pi/4)
+                rear_mask = (np.abs(angles) > 3 * np.pi / 4) & (ranges < threshold)
+                # Left sector: 45 to 135 deg
+                left_mask = (angles >= np.pi / 4) & (angles <= 3 * np.pi / 4) & (ranges < threshold)
+                # Right sector: -135 to -45 deg
+                right_mask = (angles <= -np.pi / 4) & (angles >= -3 * np.pi / 4) & (ranges < threshold)
+                
+                collision_detected = np.any(front_mask) or np.any(rear_mask) or np.any(left_mask) or np.any(right_mask)
+                
+                collision_msg = {
+                    "type": "collision",
+                    "collision": bool(collision_detected),
+                    "front": bool(np.any(front_mask)),
+                    "rear": bool(np.any(rear_mask)),
+                    "left": bool(np.any(left_mask)),
+                    "right": bool(np.any(right_mask))
+                }
+                
+                # Broadcast collision state to all websocket clients
+                for client in websocket_clients:
+                    try:
+                        client.write_message(json.dumps(collision_msg))
+                    except Exception:
+                        pass
+        except Exception as e:
+            self.get_logger().error(f"Error in scan processing: {e}")
 
     def map_callback(self, msg):
         global latest_map_data
@@ -292,10 +335,10 @@ class TeleopNode(Node):
         twist.angular.z = float(th)
         self.pub.publish(twist)
 
-class MainPortalHandler(tornado.web.RequestHandler):
+class MainHandler(tornado.web.RequestHandler):
     """Serves the portal page containing choices for Manual Teleop or Auto Exploration."""
     def get(self):
-        self.render("portal.html")
+        self.render("index.html")
 
 class TeleopHandler(tornado.web.RequestHandler):
     """Serves the Manual Teleop interface."""
@@ -445,7 +488,7 @@ def main():
     static_path = os.path.join(share_dir, 'static')
     
     app = tornado.web.Application([
-        (r"/", MainPortalHandler),
+        (r"/", MainHandler),
         (r"/teleop", TeleopHandler),
         (r"/explorer", ExplorerHandler),
         (r"/ws", WSHandler),
