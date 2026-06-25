@@ -46,10 +46,6 @@ def generate_launch_description():
         'local_search_radius', default_value='3.0',
         description='Radius for local sector search (m)'
     )
-    hysteresis_factor_arg = DeclareLaunchArgument(
-        'hysteresis_factor', default_value='100.0',
-        description='Weight hysteresis factor to prevent sector switching oscillations'
-    )
 
     # Explorer node
     explorer_node = Node(
@@ -68,7 +64,6 @@ def generate_launch_description():
             'max_exploration_laps': LaunchConfiguration('max_exploration_laps'),
             'thumbtack_spacing': LaunchConfiguration('thumbtack_spacing'),
             'local_search_radius': LaunchConfiguration('local_search_radius'),
-            'hysteresis_factor': LaunchConfiguration('hysteresis_factor'),
         }]
     )
 
@@ -83,6 +78,5 @@ def generate_launch_description():
         max_exploration_laps_arg,
         thumbtack_spacing_arg,
         local_search_radius_arg,
-        hysteresis_factor_arg,
         explorer_node
     ])

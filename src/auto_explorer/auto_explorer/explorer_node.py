@@ -59,7 +59,6 @@ class AutoExplorerNode(Node):
         self.declare_parameter('max_exploration_laps', 1)  # number of passes to make before completing
         self.declare_parameter('thumbtack_spacing', 0.5)   # meters
         self.declare_parameter('local_search_radius', 3.0) # meters
-        self.declare_parameter('hysteresis_factor', 1.25)  # threshold factor to switch target sectors
         
         # Get parameters
         self.map_frame = self.get_parameter('map_frame').value
@@ -74,7 +73,6 @@ class AutoExplorerNode(Node):
         self.max_exploration_laps = self.get_parameter('max_exploration_laps').value
         self.thumbtack_spacing = self.get_parameter('thumbtack_spacing').value
         self.local_search_radius = self.get_parameter('local_search_radius').value
-        self.hysteresis_factor = self.get_parameter('hysteresis_factor').value
         
         self.get_logger().info(
             f"auto_explorer node started with 4-phase algorithm parameters:\n"
@@ -84,8 +82,7 @@ class AutoExplorerNode(Node):
             f"  angular_speed_max: {self.angular_speed_max} rad/s\n"
             f"  robot_radius (inflation): {self.robot_radius} m\n"
             f"  thumbtack_spacing: {self.thumbtack_spacing} m\n"
-            f"  local_search_radius: {self.local_search_radius} m\n"
-            f"  hysteresis_factor: {self.hysteresis_factor}"
+            f"  local_search_radius: {self.local_search_radius} m"
         )
         
         # QoS setup for OccupancyGrid (reliable & transient local)
@@ -135,8 +132,6 @@ class AutoExplorerNode(Node):
         self.frontier_mask = None
         self.scan_data = None
         self.current_target = None
-        self.active_sector = None
-        self.active_sector_weight = 0
         
         # Navigating state for Phase 3
         self.is_navigating = False
@@ -283,8 +278,6 @@ class AutoExplorerNode(Node):
             self.backtrack_target = None
             self.cached_path = None
             self.state = 'INIT'
-            self.active_sector = None
-            self.active_sector_weight = 0
             self.cancel_nav_goal()
             self.stop_robot()
             self.get_logger().info("Exploration Reset.")
@@ -468,8 +461,6 @@ class AutoExplorerNode(Node):
                     pass
             self.backtrack_target = None
             self.current_target = None
-            self.active_sector = None
-            self.active_sector_weight = 0
             self.state = 'EXPLORE'
 
     def control_loop(self):
@@ -606,35 +597,11 @@ class AutoExplorerNode(Node):
                 self.is_navigating = False
                 self.backtrack_target = None
                 self.current_target = None
-                self.active_sector = None
-                self.active_sector_weight = 0
                 self.get_logger().info("Dead end reached (all sector weights are 0). Switching to Phase 3 (Backtracking)...")
             else:
-                # Phase 2: Local steer and drive with target hysteresis
-                use_active = False
-                if (self.active_sector is not None 
-                        and not sector_blocked[self.active_sector] 
-                        and weights[self.active_sector] > 0):
-                    # Stick to current sector unless max_weight is significantly higher
-                    hysteresis_threshold = int(weights[self.active_sector] * self.hysteresis_factor)
-                    if max_weight > hysteresis_threshold:
-                        use_active = False
-                    else:
-                        use_active = True
-
-                if use_active:
-                    k_target = self.active_sector
-                    self.active_sector_weight = weights[k_target]
-                else:
-                    best_sectors = [k for k in range(12) if weights[k] == max_weight]
-                    k_target = random.choice(best_sectors)
-                    if k_target != self.active_sector:
-                        self.get_logger().info(
-                            f"Sector switched: {self.active_sector} (weight {self.active_sector_weight}) -> "
-                            f"{k_target} (weight {max_weight})"
-                        )
-                    self.active_sector = k_target
-                    self.active_sector_weight = max_weight
+                # Phase 2: Local steer and drive
+                best_sectors = [k for k in range(12) if weights[k] == max_weight]
+                k_target = random.choice(best_sectors)
                 
                 # Target center local angle
                 phi = (k_target * 30.0 - 180.0 + 15.0) * math.pi / 180.0
@@ -686,8 +653,6 @@ class AutoExplorerNode(Node):
                 self.get_logger().info("Sectors re-detected unknown cells nearby. Re-taking control (returning to Phase 2)...")
                 self.cancel_nav_goal()
                 self.state = 'EXPLORE'
-                self.active_sector = None
-                self.active_sector_weight = 0
                 return
                 
             # If we reached the backtracking target, cancel and return to Phase 2
@@ -697,8 +662,6 @@ class AutoExplorerNode(Node):
                     self.get_logger().info("Approached target thumbtack. Re-taking control (returning to Phase 2)...")
                     self.cancel_nav_goal()
                     self.state = 'EXPLORE'
-                    self.active_sector = None
-                    self.active_sector_weight = 0
                     return
                     
             # If not currently navigating, search for nearest thumbtack
