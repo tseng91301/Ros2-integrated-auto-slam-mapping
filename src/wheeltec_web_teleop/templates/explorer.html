@@ -7,164 +7,296 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at center, #0d1527 0%, #030712 100%);
-            color: #f3f4f6;
-            overflow: hidden;
+        .explorer-layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            height: calc(100vh - 120px);
         }
-        .placeholder-container {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 600px;
-            padding: 2rem;
-            box-sizing: border-box;
-            text-align: center;
+        @media (max-width: 1024px) {
+            .explorer-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
         }
-        .placeholder-card {
-            background: rgba(30, 41, 59, 0.3);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+        .control-group {
+            background: rgba(30, 41, 59, 0.35);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
-            padding: 3.5rem 2rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            gap: 1rem;
         }
-        .placeholder-logo {
+        .control-group h3 {
             font-family: 'Orbitron', sans-serif;
-            font-size: 2.2rem;
-            font-weight: 900;
-            letter-spacing: 3px;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            margin: 0 0 0.25rem 0;
             color: #ffffff;
-            margin: 0 0 1.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.5rem;
         }
-        .placeholder-logo span {
-            color: #06b6d4;
-            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
-        .placeholder-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .explorer-btn {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: rgba(6, 182, 212, 0.1);
-            border: 2px dashed rgba(6, 182, 212, 0.4);
+            gap: 0.5rem;
+        }
+        .explorer-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .btn-primary {
+            background: rgba(6, 182, 212, 0.15);
+            border-color: rgba(6, 182, 212, 0.4);
             color: #06b6d4;
-            margin-bottom: 2rem;
-            animation: rotate-dash 10s linear infinite;
         }
-        @keyframes rotate-dash {
-            100% { transform: rotate(360deg); }
-        }
-        .placeholder-desc {
-            font-size: 1.05rem;
-            color: #9ca3af;
-            line-height: 1.6;
-            margin-bottom: 2.5rem;
-            font-weight: 300;
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(245, 158, 11, 0.15);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            color: #f59e0b;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-family: 'Orbitron', sans-serif;
-            font-weight: 600;
-            letter-spacing: 1px;
-            margin-bottom: 2rem;
-            text-transform: uppercase;
-        }
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #f59e0b;
-            box-shadow: 0 0 8px #f59e0b;
-            animation: pulse-dot 1.5s infinite;
-        }
-        @keyframes pulse-dot {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
-        }
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 0.8rem 2.2rem;
-            border-radius: 30px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            border: 1px solid rgba(6, 182, 212, 0.4);
-            background: rgba(6, 182, 212, 0.1);
-            color: #06b6d4;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-        .back-btn:hover {
+        .btn-primary:hover {
             background: #06b6d4;
             color: #0f172a;
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
-            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
         }
-        .back-btn:active {
-            transform: translateY(0);
+        .btn-warn {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #f59e0b;
+        }
+        .btn-warn:hover {
+            background: #f59e0b;
+            color: #0f172a;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.35);
+        }
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+        .btn-danger:hover {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+        .btn-estop-explorer {
+            padding: 1.25rem;
+            font-size: 1.1rem;
+            font-family: 'Orbitron', sans-serif;
+            background: rgba(239, 68, 68, 0.35);
+            border-color: #ef4444;
+            color: #ef4444;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+        }
+        .btn-estop-explorer:hover {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
+        }
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .input-group input {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: #ffffff;
+            padding: 0.5rem;
+            width: 70px;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+        }
+        .input-group input:focus {
+            border-color: #06b6d4;
+            outline: none;
+        }
+        .sidebar-scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+        /* Custom scrollbar */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+        .monitor-panel {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .map-container {
+            flex-grow: 1;
+            position: relative;
         }
     </style>
 </head>
 <body>
     <div class="stars-bg"></div>
-    <div class="placeholder-container">
-        <div class="placeholder-card">
-            <div class="placeholder-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-                </svg>
+    
+    <div class="app-container">
+        <!-- HEADER / TELEMETRY HUD -->
+        <header class="hud-header">
+            <div class="hud-logo">
+                <a href="/" style="text-decoration: none; color: inherit;">
+                    <span class="logo-accent">THOR</span> EXPLORER
+                </a>
             </div>
             
-            <h1 class="placeholder-logo"><span>AUTO</span> EXPLORER</h1>
-            
-            <div class="status-badge">
-                <span class="status-dot"></span>
-                Under Construction
+            <div class="hud-telemetry">
+                <div class="tel-item">
+                    <span class="tel-label">STATUS:</span>
+                    <span class="tel-value text-cyan" id="val-status">PAUSED</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">ACTIVE GOAL:</span>
+                    <span class="tel-value" id="val-goal">None</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">LAP PROGRESS:</span>
+                    <span class="tel-value text-purple" id="val-laps">1 / 1</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">FRONTIERS:</span>
+                    <span class="tel-value" id="val-frontiers">0 clusters</span>
+                </div>
             </div>
-            
-            <p class="placeholder-desc">
-                Autonomous exploration mode using frontier-based clustering and path planning is currently deactivated. The user interface and integration nodes are prepared for future modules.
-            </p>
-            
-            <a href="/" class="back-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Return to Portal
-            </a>
+
+            <div class="hud-status">
+                <div class="status-indicator offline" id="status-dot"></div>
+                <span class="status-text" id="status-text">OFFLINE</span>
+            </div>
+        </header>
+
+        <!-- EXPLORER GRID VIEW -->
+        <div class="explorer-layout">
+            <!-- MAP PANEL -->
+            <section class="monitor-panel">
+                <div class="monitor-screen" style="height: 100%; display: flex; flex-direction: column;">
+                    <div class="scanlines"></div>
+                    <div class="monitor-header-bar">
+                        <span class="terminal-text">SYS.EXPLORATION.MONITOR</span>
+                        <div class="monitor-resolution" id="map-telemetry">Map: Waiting...</div>
+                    </div>
+                    
+                    <div class="map-container">
+                        <canvas id="map-canvas"></canvas>
+                        <div class="map-overlay-grid"></div>
+                        <div class="map-controls">
+                            <button class="map-ctrl-btn" id="btn-zoom-in" title="Zoom In">+</button>
+                            <button class="map-ctrl-btn" id="btn-zoom-out" title="Zoom Out">-</button>
+                            <button class="map-ctrl-btn" id="btn-zoom-reset" title="Reset View">⟲</button>
+                        </div>
+                        <div class="map-loading" id="map-placeholder">
+                            <div class="radar-sweep"></div>
+                            <span class="pulse-text">CONNECTING TO ROS2 ENVIRONMENT...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONTROLS SIDEBAR -->
+            <aside class="sidebar-scroll">
+                <!-- EXPLORATION ENGINE CONTROL -->
+                <div class="control-group">
+                    <h3>EXPLORATION CONTROLLER</h3>
+                    <div class="btn-stack">
+                        <button class="explorer-btn btn-primary" id="btn-start">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            START EXPLORATION
+                        </button>
+                        <div class="btn-row">
+                            <button class="explorer-btn btn-warn" id="btn-pause" style="flex: 1;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                PAUSE
+                            </button>
+                            <button class="explorer-btn btn-primary" id="btn-resume" style="flex: 1;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                RESUME
+                            </button>
+                        </div>
+                        <button class="explorer-btn" id="btn-reset-explore">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                            RESET EXPLORATOR
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CONFIGURATION -->
+                <div class="control-group">
+                    <h3>LOOP SETTINGS</h3>
+                    <div class="input-group">
+                        <label for="lap-input" style="font-size: 0.85rem; color: #9ca3af; flex-grow: 1;">Exploration Laps:</label>
+                        <input type="number" id="lap-input" min="1" max="10" value="1">
+                        <button class="explorer-btn btn-primary" id="btn-set-laps" style="padding: 0.5rem 1rem;">SET</button>
+                    </div>
+                </div>
+
+                <!-- SLAM MAP MANAGEMENT -->
+                <div class="control-group">
+                    <h3>MAP MANAGEMENT</h3>
+                    <div class="btn-stack">
+                        <button class="explorer-btn" id="btn-save-robot">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            SAVE MAP (ROBOT)
+                        </button>
+                        <button class="explorer-btn btn-danger-hover" id="btn-reset-map">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                            RESET SLAM MAP
+                        </button>
+                        <div class="btn-row">
+                            <button class="explorer-btn" id="btn-download-png" style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                DOWNLOAD PNG
+                            </button>
+                            <button class="explorer-btn" id="btn-download-ros" style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                DOWNLOAD ZIP
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EMERGENCY TERMINATION -->
+                <div class="control-group" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.25);">
+                    <button class="explorer-btn btn-estop-explorer" id="btn-estop">
+                        EMERGENCY STOP
+                    </button>
+                </div>
+            </aside>
         </div>
     </div>
+    
+    <script src="/static/js/explorer.js"></script>
 </body>
 </html>
