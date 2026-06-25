@@ -28,6 +28,20 @@ websocket_clients = set()
 latest_map_data = None  # Cache for map updates
 latest_markers_data = None  # Cache for exploration markers
 latest_status_data = None  # Cache for exploration status
+main_loop = None  # Main thread's Tornado IOLoop
+
+def safe_broadcast(message_dict):
+    global main_loop, websocket_clients
+    if main_loop is None or not websocket_clients:
+        return
+    msg_str = json.dumps(message_dict)
+    def broadcast():
+        for client in list(websocket_clients):
+            try:
+                client.write_message(msg_str)
+            except Exception:
+                pass
+    main_loop.add_callback(broadcast)
 
 class TeleopNode(Node):
     def __init__(self):
@@ -144,11 +158,7 @@ class TeleopNode(Node):
                 }
                 
                 # Broadcast collision state to all websocket clients
-                for client in websocket_clients:
-                    try:
-                        client.write_message(json.dumps(collision_msg))
-                    except Exception:
-                        pass
+                safe_broadcast(collision_msg)
         except Exception as e:
             self.get_logger().error(f"Error in scan processing: {e}")
 
@@ -185,11 +195,7 @@ class TeleopNode(Node):
             }
             
             # Broadcast to all websocket clients
-            for client in websocket_clients:
-                try:
-                    client.write_message(json.dumps(latest_map_data))
-                except Exception:
-                    pass
+            safe_broadcast(latest_map_data)
         except Exception as e:
             self.get_logger().error(f"Error processing map: {str(e)}")
 
@@ -217,11 +223,7 @@ class TeleopNode(Node):
         }
         
         # Broadcast status to Web clients
-        for client in websocket_clients:
-            try:
-                client.write_message(json.dumps(latest_markers_data))
-            except Exception:
-                pass
+        safe_broadcast(latest_markers_data)
 
     def status_callback(self, msg):
         """Processes the exploration status and forwards it to WebSocket clients."""
@@ -237,11 +239,7 @@ class TeleopNode(Node):
                 "blacklist_count": data.get("blacklist_count"),
                 "robot_radius": data.get("robot_radius", 0.20)
             }
-            for client in websocket_clients:
-                try:
-                    client.write_message(json.dumps(latest_status_data))
-                except Exception:
-                    pass
+            safe_broadcast(latest_status_data)
         except Exception as e:
             pass
 
@@ -273,11 +271,7 @@ class TeleopNode(Node):
             }
             
             # Broadcast pose
-            for client in websocket_clients:
-                try:
-                    client.write_message(json.dumps(pose_data))
-                except Exception:
-                    pass
+            safe_broadcast(pose_data)
         except Exception:
             # Normal to fail if TF tree is not complete yet
             pass
@@ -474,7 +468,8 @@ class DownloadMapHandler(tornado.web.RequestHandler):
             self.write(f"Error saving map: {str(e)}")
 
 def main():
-    global ros_node
+    global ros_node, main_loop
+    main_loop = tornado.ioloop.IOLoop.current()
     rclpy.init()
     ros_node = TeleopNode()
     
@@ -501,7 +496,7 @@ def main():
     ros_node.get_logger().info("Web server started at http://0.0.0.0:8080")
     
     try:
-        tornado.ioloop.IOLoop.current().start()
+        main_loop.start()
     except KeyboardInterrupt:
         pass
     finally:
