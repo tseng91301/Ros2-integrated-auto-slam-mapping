@@ -6,6 +6,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from std_msgs.msg import String
 from visualization_msgs.msg import MarkerArray
+from sensor_msgs.msg import LaserScan
 import threading
 import tornado.ioloop
 import tornado.web
@@ -34,6 +35,15 @@ class TeleopNode(Node):
         
         # Publisher for velocity commands (Teleop)
         self.pub = self.create_publisher(Twist, 'cmd_vel', 10)
+        
+        # Subscriber for lidar scan (for collision avoidance / safeguard)
+        self.latest_scan = None
+        self.sub_scan = self.create_subscription(
+            LaserScan,
+            'scan',
+            self.scan_callback,
+            10
+        )
         
         # Subscriber for map updates
         self.sub_map = self.create_subscription(
@@ -95,6 +105,9 @@ class TeleopNode(Node):
             self.get_logger().info("SLAM Toolbox reset service call successful.")
         except Exception as e:
             self.get_logger().error(f"SLAM Toolbox reset service call failed: {e}")
+
+    def scan_callback(self, msg):
+        self.latest_scan = msg
 
     def map_callback(self, msg):
         global latest_map_data
@@ -227,9 +240,52 @@ class TeleopNode(Node):
             pass
 
     def publish_twist(self, x, y, th):
+        safe_x = float(x)
+        safe_y = float(y)
+        
+        if self.latest_scan is not None:
+            try:
+                ranges = np.array(self.latest_scan.ranges)
+                # Replace inf/nan with large numbers
+                ranges = np.nan_to_num(ranges, nan=10.0, posinf=10.0, neginf=10.0)
+                
+                num_readings = len(ranges)
+                if num_readings > 0:
+                    angles = self.latest_scan.angle_min + np.arange(num_readings) * self.latest_scan.angle_increment
+                    # Normalize angles to [-pi, pi]
+                    angles = (angles + np.pi) % (2 * np.pi) - np.pi
+                    
+                    # Obstacle threshold distance (e.g. 0.35m)
+                    threshold = 0.35
+                    
+                    # Front sector: |angle| < 45 deg (pi/4)
+                    front_mask = (np.abs(angles) < np.pi / 4) & (ranges < threshold)
+                    # Rear sector: |angle| > 135 deg (3*pi/4)
+                    rear_mask = (np.abs(angles) > 3 * np.pi / 4) & (ranges < threshold)
+                    # Left sector: 45 to 135 deg
+                    left_mask = (angles >= np.pi / 4) & (angles <= 3 * np.pi / 4) & (ranges < threshold)
+                    # Right sector: -135 to -45 deg
+                    right_mask = (angles <= -np.pi / 4) & (angles >= -3 * np.pi / 4) & (ranges < threshold)
+                    
+                    if safe_x > 0 and np.any(front_mask):
+                        self.get_logger().warn("⚠️ Obstacle detected in FRONT. Blocking forward motion!")
+                        safe_x = 0.0
+                    elif safe_x < 0 and np.any(rear_mask):
+                        self.get_logger().warn("⚠️ Obstacle detected in REAR. Blocking backward motion!")
+                        safe_x = 0.0
+                        
+                    if safe_y > 0 and np.any(left_mask):
+                        self.get_logger().warn("⚠️ Obstacle detected on LEFT. Blocking left motion!")
+                        safe_y = 0.0
+                    elif safe_y < 0 and np.any(right_mask):
+                        self.get_logger().warn("⚠️ Obstacle detected on RIGHT. Blocking right motion!")
+                        safe_y = 0.0
+            except Exception as e:
+                self.get_logger().error(f"Error in collision safety check: {str(e)}")
+
         twist = Twist()
-        twist.linear.x = float(x)
-        twist.linear.y = float(y)
+        twist.linear.x = safe_x
+        twist.linear.y = safe_y
         twist.linear.z = 0.0
         twist.angular.x = 0.0
         twist.angular.y = 0.0

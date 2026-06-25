@@ -132,6 +132,7 @@ class AutoExplorerNode(Node):
         self.target_start_time = None
         
         self.last_robot_pos = None
+        self.last_robot_yaw = None
         self.last_robot_pos_time = None
         
         # Control loop timer
@@ -175,6 +176,7 @@ class AutoExplorerNode(Node):
             self.cached_path = None
             self.last_path_plan_time = 0.0
             self.last_robot_pos = None
+            self.last_robot_yaw = None
             self.stop_robot()
             self.get_logger().info("Exploration Reset.")
         elif cmd.startswith('set_laps:'):
@@ -529,6 +531,7 @@ class AutoExplorerNode(Node):
             self.cached_path = None  # Force path replanning
             self.target_start_time = current_time_sec
             self.last_robot_pos = (robot_x, robot_y)
+            self.last_robot_yaw = robot_yaw
             self.last_robot_pos_time = current_time_sec
             self.get_logger().info(f"Target selected: ({self.current_target[0]:.2f}, {self.current_target[1]:.2f}) - Distance: {min_dist:.2f}m (Lap {self.current_lap}/{self.max_exploration_laps})")
 
@@ -547,14 +550,20 @@ class AutoExplorerNode(Node):
             dt = current_time_sec - self.last_robot_pos_time
             if dt >= 3.0:
                 dist_moved = math.hypot(robot_x - self.last_robot_pos[0], robot_y - self.last_robot_pos[1])
-                if dist_moved < 0.15:
-                    self.get_logger().warn(f"Robot stuck! (Moved only {dist_moved:.2f}m in {dt:.1f}s). Blacklisting target.")
+                # Calculate angle turned (accounting for wrap-around)
+                yaw_diff = abs(robot_yaw - self.last_robot_yaw)
+                yaw_diff = min(yaw_diff, 2 * math.pi - yaw_diff)
+                
+                # Only declare stuck if BOTH translation and rotation are minimal
+                if dist_moved < 0.15 and yaw_diff < 0.2:
+                    self.get_logger().warn(f"Robot stuck! (Moved {dist_moved:.2f}m, turned {yaw_diff:.2f}rad in {dt:.1f}s). Blacklisting target.")
                     self.blacklist.append(self.current_target)
                     self.current_target = None
                     self.cached_path = None
                     self.stop_robot()
                     return
                 self.last_robot_pos = (robot_x, robot_y)
+                self.last_robot_yaw = robot_yaw
                 self.last_robot_pos_time = current_time_sec
 
         # Target reached check

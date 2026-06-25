@@ -34,6 +34,10 @@ def generate_launch_description():
         'min_frontier_size', default_value='5',
         description='Minimum number of cells to form a valid frontier cluster'
     )
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time', default_value='false',
+        description='Use simulation clock if true'
+    )
 
     # Explorer node
     explorer_node = Node(
@@ -49,6 +53,7 @@ def generate_launch_description():
             'obstacle_safety_dist': LaunchConfiguration('obstacle_safety_dist'),
             'obstacle_critical_dist': LaunchConfiguration('obstacle_critical_dist'),
             'min_frontier_size': LaunchConfiguration('min_frontier_size'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
         }]
     )
 
@@ -60,5 +65,6 @@ def generate_launch_description():
         obstacle_safety_dist_arg,
         obstacle_critical_dist_arg,
         min_frontier_size_arg,
+        use_sim_time_arg,
         explorer_node
     ])

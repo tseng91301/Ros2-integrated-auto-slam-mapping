@@ -42,8 +42,11 @@ show_help() {
     echo "💡 預設預載組合模式 (Presets):"
     echo "  $0 teleop       - 啟動底盤控制器 + 鍵盤遙控 (雙分割畫面)"
     echo "  $0 slam_all     - 啟動底盤 + 雷達 + SLAM 建圖 + 鍵盤遙控 + RViz2 (多視窗格與分頁)"
-    echo "  $0 web_all      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + RViz2 (多視窗格與分頁)"
-    echo "  $0 explore      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + 自主探索 + RViz2 (五分割畫面)"
+    echo "  $0 web_all      - 啟動底盤 + 雷達 + SLAM 建圖 + 網頁遙控 + 自主探索 + RViz2 (一鍵部署實體建圖、遙控與探索)"
+    echo "  $0 explore      - 同 web_all"
+    echo "  $0 sim_web_all  - 啟動 Gazebo 模擬器 + SLAM 建圖 + 網頁遙控 + 自主探索 (一鍵部署模擬建圖與探索)"
+    echo "  $0 sim_explore  - 同 sim_web_all"
+    echo "  $0 sim_keyboard - 啟動 Gazebo 模擬器 + SLAM 建圖 + 鍵盤遙控 + RViz2 (電腦鍵盤控制並在螢幕上顯示)"
     echo "  $0 terminal     - 單純開啟一個 source 好環境的 ROS 2 Docker 互動終端機 (加 -kill 強制清理舊進程)"
     echo ""
     echo "⚙️ 全局參數選項 (Options):"
@@ -95,7 +98,7 @@ else
 fi
 
 # 檢查是否需要啟動 GUI，如果是，先在 Host 本機端執行 xhost 授權 (避免在容器內報錯)
-if [[ " $@ " =~ " rviz " ]] || [[ " $@ " =~ " rviz2 " ]] || [[ " $@ " =~ " slam_all " ]]; then
+if [[ " $@ " =~ " rviz " ]] || [[ " $@ " =~ " rviz2 " ]] || [[ " $@ " =~ " slam_all " ]] || [[ " $@ " =~ " sim_web_all " ]] || [[ " $@ " =~ " sim_explore " ]] || [[ " $@ " =~ " sim_keyboard " ]]; then
     echo "🖥️ 正在 Host 端授權 X11 顯示存取權 (xhost +local:docker)..."
     xhost +local:docker 2>/dev/null || true
 fi
@@ -124,6 +127,8 @@ if [ "$SHOULD_CLEAN" == "true" ]; then
     docker exec isaac_ros_dev_container pkill -9 -f [j]oint_state_publisher 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 -f [w]heeltec_keyboard 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 -f [w]eb_server 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [g]z 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [r]uby 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 rviz2 2>/dev/null || true
     sleep 1
 else
@@ -194,49 +199,9 @@ if [ "$1" == "slam_all" ]; then
     exit 0
 fi
 
-# ==================== 預設模式 3: web_all ====================
-if [ "$1" == "web_all" ]; then
-    echo "🚀 正在以 [web_all] 模式啟動底盤、雷達、建圖、網頁遙控與 RViz2..."
-    
-    # 建立會話，第一個分頁命名為 SLAM
-    tmux new-session -d -s "$SESSION_NAME" -n "SLAM"
-    
-    # 1. 啟動底盤 (左上角) - 寫入當前活動的 pane 0
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch base_control_ros2 00_base_control.launch.py'" C-m
-    
-    # 左右分割：右側 (新分割出的活動 pane 1)
-    tmux split-window -h -t "$SESSION_NAME"
-    # 右上角: SLAM 建圖
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py'" C-m
-    
-    # 選擇左側窗格 (索引 0)
-    tmux select-pane -t 0
-    # 上下分割左側：左下角 (新分割出的活動 pane 1)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 左下角: 雷達
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=/dev/sllidar_a2m12'" C-m
-    
-    # 選擇右側右上窗格 (此時索引已變為 2)
-    tmux select-pane -t 2
-    # 上下分割右側：右下角 (新分割出的活動 pane 3)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 右下角: 網頁遙控
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_teleop.launch.py'" C-m
-    
-    # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2
-    tmux new-window -t "$SESSION_NAME" -n "RViz2"
-    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
-    
-    # 回到第一個分頁並選取網頁遙控窗格 (此時索引為 3)
-    tmux select-window -t "$SESSION_NAME:0"
-    tmux select-pane -t 3
-    tmux attach-session -t "$SESSION_NAME"
-    exit 0
-fi
-
-# ==================== 預設模式 3.5: explore ====================
-if [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
-    echo "🚀 正在以 [explore] 模式啟動底盤、雷達、建圖、網頁監控、自動探索與 RViz2..."
+# ==================== 預設模式 3.5: web_all / explore ====================
+if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
+    echo "🚀 正在以 [web_all / explore] 模式啟動底盤、雷達、建圖、網頁監控、自動探索與 RViz2..."
     
     # 建立會話，第一個分頁命名為 SLAM
     tmux new-session -d -s "$SESSION_NAME" -n "SLAM"
@@ -277,6 +242,57 @@ if [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
     # 回到第一個分頁並選取自動探索窗格 (此時索引為 4)
     tmux select-window -t "$SESSION_NAME:0"
     tmux select-pane -t 4
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
+# ==================== 預設模式 3.6: sim_web_all / sim_explore ====================
+if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
+    echo "🚀 正在以 [sim_web_all / sim_explore] 模式啟動 Gazebo 模擬器、SLAM 建圖、網頁監控、自動探索與 RViz2..."
+    
+    # 建立會話，第一個分頁命名為 Simulation
+    tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
+    
+    # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False'" C-m
+    
+    # 左右分割：右側 (新分割出的活動 pane 1)
+    tmux split-window -h -t "$SESSION_NAME"
+    # 右上角: 網頁遙控與伺服器 (啟用 use_sim_time:=true)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_teleop.launch.py use_sim_time:=true'" C-m
+    
+    # 選擇右側窗格 (索引 1)
+    tmux select-pane -t 1
+    # 上下分割右側：右下角 (新分割出的活動 pane 2)
+    tmux split-window -v -t "$SESSION_NAME"
+    # 右下角: 自動探索節點 (啟用 use_sim_time:=true)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch auto_explorer auto_exploration.launch.py use_sim_time:=true'" C-m
+    
+    # 回到第一個分頁並選取自動探索窗格 (索引 2)
+    tmux select-window -t "$SESSION_NAME:0"
+    tmux select-pane -t 2
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
+# ==================== 預設模式 3.8: sim_keyboard ====================
+if [ "$1" == "sim_keyboard" ]; then
+    echo "🚀 正在以 [sim_keyboard] 模式啟動 Gazebo 模擬器、SLAM 建圖、鍵盤遙控與 RViz2..."
+    
+    # 建立會話，第一個分頁命名為 Simulation
+    tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
+    
+    # 1. 啟動 Gazebo 模擬器與 SLAM 項目
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
+    
+    # 左右分割：右側 (新分割出的活動 pane 1)
+    tmux split-window -h -t "$SESSION_NAME"
+    # 右側: 鍵盤遙控
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 run wheeltec_robot_keyboard wheeltec_keyboard --ros-args -p use_sim_time:=true'" C-m
+    
+    # 回到第一個分頁並選取鍵盤控制窗格 (索引 1)
+    tmux select-window -t "$SESSION_NAME:0"
+    tmux select-pane -t 1
     tmux attach-session -t "$SESSION_NAME"
     exit 0
 fi
