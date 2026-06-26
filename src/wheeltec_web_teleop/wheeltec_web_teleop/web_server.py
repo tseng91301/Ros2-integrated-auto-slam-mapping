@@ -424,7 +424,21 @@ class TeleopNode(Node):
                 
                 num_readings = len(ranges)
                 if num_readings > 0:
+                    # Determine yaw offset between scan frame and robot base frame
+                    yaw_offset = 0.0
+                    for base_frame in ['base_link', 'base_footprint']:
+                        try:
+                            trans = self.tf_buffer.lookup_transform(base_frame, self.latest_scan.header.frame_id, rclpy.time.Time())
+                            q = trans.transform.rotation
+                            siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+                            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+                            yaw_offset = math.atan2(siny_cosp, cosy_cosp)
+                            break
+                        except Exception:
+                            pass
+
                     angles = self.latest_scan.angle_min + np.arange(num_readings) * self.latest_scan.angle_increment
+                    angles = angles + yaw_offset
                     # Normalize angles to [-pi, pi]
                     angles = (angles + np.pi) % (2 * np.pi) - np.pi
                     

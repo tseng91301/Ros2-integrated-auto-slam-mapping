@@ -172,6 +172,7 @@ class AutoExplorerNode(Node):
         self.is_paused = True  # Safety default: starts paused
         self.current_lap = 1
         self.exploration_complete = False
+        self.stop_cmd_count = 0
         
         # Control loop timer
         self.control_timer = self.create_timer(1.0 / self.control_rate, self.control_loop)
@@ -288,12 +289,14 @@ class AutoExplorerNode(Node):
             self.get_logger().info("Exploration Started/Resumed.")
         elif cmd == 'pause':
             self.is_paused = True
+            self.stop_cmd_count = 0
             self.stop_robot()
             self.cancel_nav_goal()
             self.get_logger().info("Exploration Paused.")
         elif cmd == 'stop':
             self.is_paused = True
             self.exploration_complete = True
+            self.stop_cmd_count = 0
             self.stop_robot()
             self.cancel_nav_goal()
             self.get_logger().info("Exploration Stopped / Interrupted.")
@@ -312,6 +315,7 @@ class AutoExplorerNode(Node):
             self.is_recovering = False
             self.heatmap_manager.reset()
             self.cancel_nav_goal()
+            self.stop_cmd_count = 0
             self.stop_robot()
             self.get_logger().info("Exploration Reset.")
         elif cmd.startswith('set_laps:'):
@@ -624,10 +628,22 @@ class AutoExplorerNode(Node):
         # Supplement obstacle block using real-time LaserScan readings
         if self.scan_data is not None:
             scan = self.scan_data
+            yaw_offset = 0.0
+            for base_frame in [self.robot_frame, 'base_link', 'base_footprint']:
+                try:
+                    trans = self.tf_buffer.lookup_transform(base_frame, scan.header.frame_id, rclpy.time.Time())
+                    q = trans.transform.rotation
+                    siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+                    cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+                    yaw_offset = math.atan2(siny_cosp, cosy_cosp)
+                    break
+                except Exception:
+                    pass
+
             for i, r in enumerate(scan.ranges):
                 if math.isfinite(r) and r > 0.0:
                     if r < self.obstacle_critical_dist:
-                        angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment)
+                        angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment + yaw_offset)
                         k = int((angle_local + math.pi) / (math.pi / 6.0)) % 12
                         sector_blocked[k] = True
                         
@@ -726,9 +742,21 @@ class AutoExplorerNode(Node):
                 min_front_r = float('inf')
                 if self.scan_data is not None:
                     scan = self.scan_data
+                    yaw_offset = 0.0
+                    for base_frame in [self.robot_frame, 'base_link', 'base_footprint']:
+                        try:
+                            trans = self.tf_buffer.lookup_transform(base_frame, scan.header.frame_id, rclpy.time.Time())
+                            q = trans.transform.rotation
+                            siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+                            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+                            yaw_offset = math.atan2(siny_cosp, cosy_cosp)
+                            break
+                        except Exception:
+                            pass
+
                     for i, r in enumerate(scan.ranges):
                         if math.isfinite(r) and r > 0.0:
-                            angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment)
+                            angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment + yaw_offset)
                             if -math.pi / 6.0 <= angle_local <= math.pi / 6.0:
                                 if r < min_front_r:
                                     min_front_r = r
@@ -742,6 +770,7 @@ class AutoExplorerNode(Node):
                 twist.linear.x = float(linear_vel)
                 twist.angular.z = float(angular_vel)
                 self.cmd_pub.publish(twist)
+                self.stop_cmd_count = 0
                 
                 # Set dynamic visualization target to closest thumbtack in this sector
                 self.current_target = None
@@ -840,10 +869,22 @@ class AutoExplorerNode(Node):
                 # Check collision stop
                 if self.scan_data is not None:
                     scan = self.scan_data
+                    yaw_offset = 0.0
+                    for base_frame in [self.robot_frame, 'base_link', 'base_footprint']:
+                        try:
+                            trans = self.tf_buffer.lookup_transform(base_frame, scan.header.frame_id, rclpy.time.Time())
+                            q = trans.transform.rotation
+                            siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+                            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+                            yaw_offset = math.atan2(siny_cosp, cosy_cosp)
+                            break
+                        except Exception:
+                            pass
+
                     min_front_r = float('inf')
                     for i, r in enumerate(scan.ranges):
                         if math.isfinite(r) and r > 0.0:
-                            angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment)
+                            angle_local = normalize_angle(scan.angle_min + i * scan.angle_increment + yaw_offset)
                             if -math.pi / 6.0 <= angle_local <= math.pi / 6.0:
                                 if r < min_front_r:
                                     min_front_r = r
@@ -856,6 +897,7 @@ class AutoExplorerNode(Node):
                 twist.linear.x = float(linear_vel)
                 twist.angular.z = float(angular_vel)
                 self.cmd_pub.publish(twist)
+                self.stop_cmd_count = 0
                 
         elif self.state == 'COMPLETE':
             self.get_logger().info("Exploration complete status active. Stop command locked.", throttle_duration_sec=10.0)
@@ -863,12 +905,15 @@ class AutoExplorerNode(Node):
             
         self.publish_markers()
 
-    def stop_robot(self):
+    def stop_robot(self, force=False):
         """Publishes a zero velocity command to bring the robot to a stop."""
-        twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self.cmd_pub.publish(twist)
+        if force or self.stop_cmd_count < 3:
+            twist = Twist()
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            self.cmd_pub.publish(twist)
+            if not force:
+                self.stop_cmd_count += 1
 
     def trigger_map_save(self):
         """Saves the final map to /home/ubuntu/maps/final_map using map_saver_cli."""
@@ -954,7 +999,7 @@ def main(args=None):
     except KeyboardInterrupt:
         node.get_logger().info("Keyboard Interrupt. Shutting down auto_explorer node...")
     finally:
-        node.stop_robot()
+        node.stop_robot(force=True)
         node.destroy_node()
         rclpy.shutdown()
 
