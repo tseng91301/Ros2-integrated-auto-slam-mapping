@@ -1,0 +1,19 @@
+robot:
+  radius: 0.22                  # 機器人的定義半徑 (m)
+  chassis_port: "/dev/playrobot_base"  # 機器人的底盤連接位置
+  lidar_port: "/dev/sllidar_a2m12"      # lidar 連接位置
+
+navigation:
+  inflation_radius: 0.75        # 導航寬限半徑 (機器人需要距離牆至少多遠) (m)
+  obstacle_critical_dist: 0.6  # 緊急避障臨界距離 (m)
+  obstacle_safety_dist: 0.35     # 避障觸發安全距離 (m)
+  
+exploration:
+  obstacle_critical_dist: 0.6  # 探索緊急避障臨界距離 (m)
+  obstacle_safety_dist: 0.3     # 探索避障觸發安全距離 (m)
+
+simulation:
+  is_sim: false                 # 是否為模擬模式 (true/false)
+  world_path: "/workspaces/isaac_ros-dev/src/auto_explorer/config/my-nav-map.sdf"  # 模擬模式用的地圖(世界)位置
+  # world_path: "/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"  # 模擬模式用的地圖(世界)位置
+  # world_path: "/workspaces/isaac_ros-dev/src/auto_explorer/config/warehouse_local.sdf"  # 模擬模式用的地圖(世界)位置

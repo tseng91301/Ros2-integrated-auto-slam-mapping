@@ -170,6 +170,30 @@
             color: #0f172a;
             box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
         }
+        .portal-card.nav-card:hover {
+            border-color: rgba(245, 158, 11, 0.4);
+            box-shadow: 0 20px 40px rgba(245, 158, 11, 0.15);
+        }
+        .nav-card .card-icon {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        .portal-card.nav-card:hover .card-icon {
+            background: #f59e0b;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+        }
+        .nav-card .enter-btn {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+        .portal-card.nav-card:hover .enter-btn {
+            background: #f59e0b;
+            color: #0f172a;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -209,6 +233,18 @@
                 <h2 class="card-title">Auto Explorer</h2>
                 <p class="card-desc">Deploy frontier-based autonomous exploration. Setup target laps, view detected centroids in real-time, and manage map saves.</p>
                 <div class="enter-btn">Explore Mode</div>
+            </a>
+
+            <!-- AUTONOMOUS NAVIGATION CARD -->
+            <a href="/navigation" class="portal-card nav-card">
+                <div class="card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                    </svg>
+                </div>
+                <h2 class="card-title">Auto Navigation</h2>
+                <p class="card-desc">Load pre-saved maps dynamically, click on the map to set a location marker, and guide the robot autonomously with real-time tracking.</p>
+                <div class="enter-btn">Navigate Mode</div>
             </a>
         </div>
     </div>
