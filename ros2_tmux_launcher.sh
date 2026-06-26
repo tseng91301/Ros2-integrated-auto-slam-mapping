@@ -10,10 +10,12 @@ CONTAINER_DISPLAY=":1"
 # 預設 ROS_DOMAIN_ID
 ROS_DOMAIN_ID_VAL="55"
 
+# 取得腳本所在的目錄 (絕對路徑)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Helper function to read parameters from robot_params.yaml
 get_yaml_param() {
-    python3 -c "import yaml; print(yaml.safe_load(open('/workspaces/isaac_ros-dev/robot_params.yaml'))$1)" 2>/dev/null || \
-    python3 -c "import yaml; print(yaml.safe_load(open('./robot_params.yaml'))$1)" 2>/dev/null
+    python3 -c "import yaml; print(yaml.safe_load(open('${SCRIPT_DIR}/robot_params.yaml'))$1)" 2>/dev/null
 }
 
 CHASSIS_PORT=$(get_yaml_param "['robot']['chassis_port']")
@@ -31,9 +33,9 @@ IS_SIM=$(get_yaml_param "['simulation']['is_sim']")
 python3 -c "
 import yaml, os
 try:
-    with open('/workspaces/isaac_ros-dev/robot_params.yaml') as f:
+    with open('${SCRIPT_DIR}/robot_params.yaml') as f:
         config = yaml.safe_load(f)
-    with open('/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml') as f:
+    with open('${SCRIPT_DIR}/src/auto_explorer/config/nav2_params_with_slam.yaml') as f:
         params = yaml.safe_load(f)
     
     radius = config.get('robot', {}).get('radius', 0.22)
@@ -50,7 +52,7 @@ try:
                 
     update_nested(params)
     
-    with open('/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml', 'w') as f:
+    with open('${SCRIPT_DIR}/src/auto_explorer/config/nav2_params_with_slam_generated.yaml', 'w') as f:
         yaml.safe_dump(params, f)
 except Exception as e:
     print('Failed to generate modified nav2 params:', e)
@@ -129,24 +131,24 @@ fi
 # 1. 確保 Docker 容器正在運行，若未運行則自動啟動
 if ! docker ps --format '{{.Names}}' | grep -q "^isaac_ros_dev_container$"; then
     echo "🔄 偵測到 isaac_ros_dev_container 容器未啟動，正在為您啟動容器..."
-    if [ -f "./start_container.sh" ]; then
-        chmod +x ./start_container.sh
-        ./start_container.sh
+    if [ -f "${SCRIPT_DIR}/start_container.sh" ]; then
+        chmod +x "${SCRIPT_DIR}/start_container.sh"
+        "${SCRIPT_DIR}/start_container.sh"
         sleep 2
     else
-        echo "❌ 錯誤: 找不到 ./start_container.sh，無法自動啟動容器！"
+        echo "❌ 錯誤: 找不到 ${SCRIPT_DIR}/start_container.sh，無法自動啟動容器！"
         exit 1
     fi
 fi
 
 # 2. 自動執行裝置掛載
 if [ "$IS_SIM" != "true" ] && [ "$IS_SIM" != "True" ]; then
-    if [ -f "./attach_devices.sh" ]; then
+    if [ -f "${SCRIPT_DIR}/attach_devices.sh" ]; then
         echo "🔄 正在自動掛載硬體裝置..."
-        chmod +x ./attach_devices.sh
-        ./attach_devices.sh "$CHASSIS_PORT" "$LIDAR_PORT" || true
+        chmod +x "${SCRIPT_DIR}/attach_devices.sh"
+        "${SCRIPT_DIR}/attach_devices.sh" "$CHASSIS_PORT" "$LIDAR_PORT" || true
     else
-        echo "⚠️ 警告: 找不到 ./attach_devices.sh，跳過裝置掛載。"
+        echo "⚠️ 警告: 找不到 ${SCRIPT_DIR}/attach_devices.sh，跳過裝置掛載。"
     fi
 else
     echo "ℹ️ 模擬模式已啟用，跳過硬體裝置掛載。"
