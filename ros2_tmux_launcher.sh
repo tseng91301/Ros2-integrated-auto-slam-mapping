@@ -4,14 +4,58 @@
 
 SESSION_NAME="ros2_dev"
 
+# 預設 GUI 顯示器位置 (若連線失敗，可視情況修改為 :0、:1 或 :1001)
+CONTAINER_DISPLAY=":1"
+
 # 預設 ROS_DOMAIN_ID
 ROS_DOMAIN_ID_VAL="55"
 
-# 預設模擬器地圖路徑 (Gazebo Simulation World Path)
-# 預設使用優化後免連網下載 Fuel 資源的本地 Warehouse 地圖
-# 若要切換成系統預設的 Sandbox 地圖，可改為空值，或指定 "/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"
-# SIM_WORLD_PATH="/workspaces/isaac_ros-dev/src/auto_explorer/config/warehouse_local.sdf"
-SIM_WORLD_PATH="/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"
+# Helper function to read parameters from robot_params.yaml
+get_yaml_param() {
+    python3 -c "import yaml; print(yaml.safe_load(open('/workspaces/isaac_ros-dev/robot_params.yaml'))$1)" 2>/dev/null || \
+    python3 -c "import yaml; print(yaml.safe_load(open('./robot_params.yaml'))$1)" 2>/dev/null
+}
+
+CHASSIS_PORT=$(get_yaml_param "['robot']['chassis_port']")
+LIDAR_PORT=$(get_yaml_param "['robot']['lidar_port']")
+SIM_WORLD_PATH=$(get_yaml_param "['simulation']['world_path']")
+IS_SIM=$(get_yaml_param "['simulation']['is_sim']")
+
+# Fallbacks if YAML reading fails
+[ -z "$CHASSIS_PORT" ] && CHASSIS_PORT="/dev/playrobot_base"
+[ -z "$LIDAR_PORT" ] && LIDAR_PORT="/dev/sllidar_a2m12"
+[ -z "$SIM_WORLD_PATH" ] && SIM_WORLD_PATH="/opt/ros/jazzy/share/nav2_minimal_tb3_sim/worlds/tb3_sandbox.sdf.xacro"
+[ -z "$IS_SIM" ] && IS_SIM="false"
+
+# Generate the dynamic Nav2 parameter file with values from robot_params.yaml
+python3 -c "
+import yaml, os
+try:
+    with open('/workspaces/isaac_ros-dev/robot_params.yaml') as f:
+        config = yaml.safe_load(f)
+    with open('/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml') as f:
+        params = yaml.safe_load(f)
+    
+    radius = config.get('robot', {}).get('radius', 0.22)
+    inflation = config.get('navigation', {}).get('inflation_radius', 0.70)
+    
+    def update_nested(d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                update_nested(v)
+            elif k == 'robot_radius':
+                d[k] = radius
+            elif k == 'inflation_radius':
+                d[k] = inflation
+                
+    update_nested(params)
+    
+    with open('/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml', 'w') as f:
+        yaml.safe_dump(params, f)
+except Exception as e:
+    print('Failed to generate modified nav2 params:', e)
+" 2>/dev/null
+
 
 # 解析自定義參數與選項
 FORCE_KILL="false"
@@ -95,12 +139,16 @@ if ! docker ps --format '{{.Names}}' | grep -q "^isaac_ros_dev_container$"; then
 fi
 
 # 2. 自動執行裝置掛載
-if [ -f "./attach_devices.sh" ]; then
-    echo "🔄 正在自動掛載硬體裝置..."
-    chmod +x ./attach_devices.sh
-    ./attach_devices.sh /dev/playrobot_base /dev/sllidar_a2m12 || true
+if [ "$IS_SIM" != "true" ] && [ "$IS_SIM" != "True" ]; then
+    if [ -f "./attach_devices.sh" ]; then
+        echo "🔄 正在自動掛載硬體裝置..."
+        chmod +x ./attach_devices.sh
+        ./attach_devices.sh "$CHASSIS_PORT" "$LIDAR_PORT" || true
+    else
+        echo "⚠️ 警告: 找不到 ./attach_devices.sh，跳過裝置掛載。"
+    fi
 else
-    echo "⚠️ 警告: 找不到 ./attach_devices.sh，跳過裝置掛載。"
+    echo "ℹ️ 模擬模式已啟用，跳過硬體裝置掛載。"
 fi
 
 # 檢查是否需要啟動 GUI，如果是，先在 Host 本機端執行 xhost 授權 (避免在容器內報錯)
@@ -145,6 +193,28 @@ fi
 DOCKER_EXEC="docker exec -it isaac_ros_dev_container"
 ROS2_SETUP="export ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL} && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash"
 
+# Check if simulation mode is configured in YAML and adjust preset accordingly
+if [ "$IS_SIM" == "true" ] || [ "$IS_SIM" == "True" ]; then
+    if [ "$1" == "teleop" ]; then
+        echo "⚠️ 偵測到 robot_params.yaml 已啟用模擬模式，自動切換至 sim_keyboard 模式..."
+        set -- "sim_keyboard" "${@:2}"
+    elif [ "$1" == "slam_all" ]; then
+        echo "⚠️ 偵測到 robot_params.yaml 已啟用模擬模式，自動切換至 sim_keyboard 模式..."
+        set -- "sim_keyboard" "${@:2}"
+    elif [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
+        echo "⚠️ 偵測到 robot_params.yaml 已啟用模擬模式，自動切換至 sim_web_all 模式..."
+        set -- "sim_web_all" "${@:2}"
+    fi
+else
+    if [ "$1" == "sim_keyboard" ]; then
+        echo "⚠️ 偵測到 robot_params.yaml 未啟用模擬模式，自動切換至 teleop 模式..."
+        set -- "teleop" "${@:2}"
+    elif [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
+        echo "⚠️ 偵測到 robot_params.yaml 未啟用模擬模式，自動切換至 web_all 模式..."
+        set -- "web_all" "${@:2}"
+    fi
+fi
+
 # ==================== 預設模式 1: teleop ====================
 if [ "$1" == "teleop" ]; then
     echo "🚀 正在以 [teleop] 模式啟動底盤及鍵盤遙控..."
@@ -185,7 +255,7 @@ if [ "$1" == "slam_all" ]; then
     # 上下分割左側：左下角 (新分割出的活動 pane 1，原右側變為 2)
     tmux split-window -v -t "$SESSION_NAME"
     # 左下角: 雷達
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=/dev/sllidar_a2m12'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=\"$LIDAR_PORT\"'" C-m
     
     # 選擇右側右上窗格 (此時索引已變為 2)
     tmux select-pane -t 2
@@ -196,7 +266,7 @@ if [ "$1" == "slam_all" ]; then
     
     # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2 (避免終端畫面太亂)
     tmux new-window -t "$SESSION_NAME" -n "RViz2"
-    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
+    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
     
     # 回到第一個分頁並選取鍵盤控制格 (此時索引為 3)，方便直接操作
     tmux select-window -t "$SESSION_NAME:0"
@@ -225,7 +295,7 @@ if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; the
     # 上下分割左側：左下角 (新分割出的活動 pane 1，原右側變為 2)
     tmux split-window -v -t "$SESSION_NAME"
     # 左下角: 雷達
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=/dev/sllidar_a2m12'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=\"$LIDAR_PORT\"'" C-m
     
     # 選擇右側右上窗格 (此時索引已變為 2)
     tmux select-pane -t 2
@@ -243,7 +313,7 @@ if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; the
     
     # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2
     tmux new-window -t "$SESSION_NAME" -n "RViz2"
-    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
+    tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
     
     # 回到第一個分頁並選取自動探索窗格 (此時索引為 4)
     tmux select-window -t "$SESSION_NAME:0"
@@ -260,7 +330,7 @@ if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_expl
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=False params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=True params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
@@ -289,7 +359,7 @@ if [ "$1" == "sim_keyboard" ]; then
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=:0 && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
@@ -319,13 +389,13 @@ if [ "$1" == "terminal" ]; then
 
         # 建立新視窗並啟動進入 Docker 的互動終端機
         tmux new-window -t "$SESSION_NAME" -n "$WINDOW_NAME"
-        tmux send-keys -t "$SESSION_NAME:$WINDOW_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && exec bash'" C-m
+        tmux send-keys -t "$SESSION_NAME:$WINDOW_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && exec bash'" C-m
         tmux select-window -t "$SESSION_NAME:$WINDOW_NAME"
     else
         # 建立全新會話
         WINDOW_NAME="Terminal-1"
         tmux new-session -d -s "$SESSION_NAME" -n "$WINDOW_NAME"
-        tmux send-keys -t "$SESSION_NAME:0.0" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && exec bash'" C-m
+        tmux send-keys -t "$SESSION_NAME:0.0" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && exec bash'" C-m
     fi
     
     tmux attach-session -t "$SESSION_NAME"
@@ -342,7 +412,7 @@ for arg in "$@"; do
             commands+=("export BASE_TYPE=NanoRobot && ros2 launch base_control_ros2 00_base_control.launch.py")
             ;;
         lidar)
-            commands+=("ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=/dev/sllidar_a2m12")
+            commands+=("ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=\"$LIDAR_PORT\"")
             ;;
         slam)
             commands+=("ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py")
@@ -357,7 +427,7 @@ for arg in "$@"; do
             commands+=("ros2 launch auto_explorer auto_exploration.launch.py")
             ;;
         rviz|rviz2)
-            commands+=("export DISPLAY=:0 && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz")
+            commands+=("export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz")
             ;;
         *)
             echo "⚠️ 未知模組: $arg (將被忽略)"

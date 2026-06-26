@@ -17,6 +17,20 @@ def generate_launch_description():
         ROBOT_TYPE = 'NanoRobot'
         print(f"\033[91m Warning:Please set the correct BASE_TYPE. Now using default: {ROBOT_TYPE}\033[0m")
 
+    # Load robot_params.yaml
+    robot_params = {}
+    for path in ['/workspaces/isaac_ros-dev/robot_params.yaml', './robot_params.yaml']:
+        if os.path.exists(path):
+            try:
+                import yaml
+                with open(path, 'r') as f:
+                    robot_params = yaml.safe_load(f)
+                break
+            except Exception as e:
+                print(f"Error loading {path}: {e}")
+
+    chassis_port = robot_params.get('robot', {}).get('chassis_port', '/dev/playrobot_base')
+
     # Group robot URDF and static TFs
     playerrobot_base = GroupAction([
         Node(
@@ -45,7 +59,7 @@ def generate_launch_description():
         remappings=[("odometry/filtered", "odom_combined")]
     )
 
-    # Declare sonar arguments (來自第二份程式的優點)
+    # Declare sonar arguments (來自第二份程式の優點)
     pub_sonar_arg = DeclareLaunchArgument(
         name='pub_sonar',
         default_value='True',
@@ -66,7 +80,8 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'pub_sonar': LaunchConfiguration('pub_sonar'),
-            'filter_sonar': LaunchConfiguration('filter_sonar')
+            'filter_sonar': LaunchConfiguration('filter_sonar'),
+            'device_port': chassis_port
         }]
     )
 

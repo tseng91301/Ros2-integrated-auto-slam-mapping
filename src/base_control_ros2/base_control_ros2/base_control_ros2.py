@@ -98,7 +98,22 @@ class BaseControl(Node):
         self.baseId = 'base_footprint'
         self.odomId = 'odom_combined'
         self.imuId = 'imu'
-        self.device_port = '/dev/playrobot_base'
+        # Load chassis_port from robot_params.yaml if available
+        import yaml
+        device_port_default = '/dev/playrobot_base'
+        for path in ['/workspaces/isaac_ros-dev/robot_params.yaml', './robot_params.yaml']:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r') as f:
+                        config = yaml.safe_load(f)
+                        if 'robot' in config and 'chassis_port' in config['robot']:
+                            device_port_default = config['robot']['chassis_port']
+                            break
+                except:
+                    pass
+
+        self.declare_parameter('device_port', device_port_default)
+        self.device_port = self.get_parameter('device_port').get_parameter_value().string_value
         self.baudrate = 115200
         self.serialIDLE_flag = 0
         self.pose_x = 0.0

@@ -5,7 +5,31 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
+    # Load robot parameters
+    import yaml
+    robot_params = {}
+    for path in ['/workspaces/isaac_ros-dev/robot_params.yaml', './robot_params.yaml']:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    robot_params = yaml.safe_load(f)
+                break
+            except Exception as e:
+                print(f"Error loading {path}: {e}")
+
+    # Set parameter defaults from YAML
+    radius_val = str(robot_params.get('robot', {}).get('radius', 0.22))
+    safety_dist_val = str(robot_params.get('exploration', {}).get('obstacle_safety_dist', 
+                          robot_params.get('navigation', {}).get('obstacle_safety_dist', 0.6)))
+    critical_dist_val = str(robot_params.get('exploration', {}).get('obstacle_critical_dist', 
+                            robot_params.get('navigation', {}).get('obstacle_critical_dist', 0.35)))
+    is_sim_val = str(robot_params.get('simulation', {}).get('is_sim', False)).lower()
+
     # Declare launch arguments
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time', default_value=is_sim_val,
+        description='Use simulation (Gazebo) clock if true'
+    )
     map_frame_arg = DeclareLaunchArgument(
         'map_frame', default_value='map',
         description='The coordinate frame of the map'
@@ -23,15 +47,15 @@ def generate_launch_description():
         description='Maximum angular speed of the robot (rad/s)'
     )
     obstacle_safety_dist_arg = DeclareLaunchArgument(
-        'obstacle_safety_dist', default_value='0.6',
+        'obstacle_safety_dist', default_value=safety_dist_val,
         description='Distance at which obstacle avoidance begins (m)'
     )
     obstacle_critical_dist_arg = DeclareLaunchArgument(
-        'obstacle_critical_dist', default_value='0.35',
+        'obstacle_critical_dist', default_value=critical_dist_val,
         description='Distance at which emergency stop/turn triggers (m)'
     )
     robot_radius_arg = DeclareLaunchArgument(
-        'robot_radius', default_value='0.25',
+        'robot_radius', default_value=radius_val,
         description='Robot physical safety radius (m)'
     )
     max_exploration_laps_arg = DeclareLaunchArgument(
@@ -89,10 +113,12 @@ def generate_launch_description():
             'stuck_temp_threshold': LaunchConfiguration('stuck_temp_threshold'),
             'heatmap_decay_rate': LaunchConfiguration('heatmap_decay_rate'),
             'heatmap_heat_increment': LaunchConfiguration('heatmap_heat_increment'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
         }]
     )
 
     return LaunchDescription([
+        use_sim_time_arg,
         map_frame_arg,
         robot_frame_arg,
         linear_speed_max_arg,

@@ -11,8 +11,23 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    import yaml
+    
+    # Load robot parameters
+    robot_params = {}
+    for path in ['/workspaces/isaac_ros-dev/robot_params.yaml', './robot_params.yaml']:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    robot_params = yaml.safe_load(f)
+                break
+            except Exception as e:
+                print(f"Error loading {path}: {e}")
+                
+    lidar_port = robot_params.get('robot', {}).get('lidar_port', '/dev/sllidar_a2m12')
+
     channel_type =  LaunchConfiguration('channel_type', default='serial')
-    serial_port = LaunchConfiguration('serial_port', default='/dev/sllidar_a2m12')
+    serial_port = LaunchConfiguration('serial_port', default=lidar_port)
     serial_baudrate = LaunchConfiguration('serial_baudrate', default='256000')
     frame_id = LaunchConfiguration('frame_id', default='laser')
     inverted = LaunchConfiguration('inverted', default='false')
