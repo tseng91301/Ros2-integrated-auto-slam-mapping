@@ -65,7 +65,7 @@ lrwxrwxrwx 1 root root 12 Jun 16 16:30 /dev/playrobot_base -> ttyCH341USB0
 透過這套 Udev 機制，我們的 ROS 2 軟體程式碼便可以使用**固定且語意清晰**的裝置路徑：
 
 ### 1. 底盤驅動 (`base_control_ros2`)
-* 目前已將 [base_control_ros2.py](file:///home/ubuntu/steven_verify_ws/src/base_control_ros2/base_control_ros2/base_control_ros2.py) 中的序列埠讀取設定還原為預設的 `/dev/playrobot_base`。
+* 目前已將 [base_control_ros2.py](src/base_control_ros2/base_control_ros2/base_control_ros2.py) 中的序列埠讀取設定還原為預設的 `/dev/playrobot_base`。
 * 不論您的 USB 序列埠插拔後變成 `ttyCH341USB0` 或其他名稱，驅動都能主動且精準地找到底盤。
 
 ### 2. 雷達驅動 (`sllidar_ros2`)

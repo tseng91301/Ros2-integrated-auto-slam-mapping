@@ -5,15 +5,15 @@
 ---
 
 ## 🗺️ 相關文件連結
-- **主入口指南**：[Readme.md](file:///home/ubuntu/workspaces/isaac_ros-dev/Readme.md)
-- **一鍵啟動 (Tmux 腳本)**：[launcher_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/launcher_guide.md)
-- **自主探索與避障原理**：[working_principles.md](file:///home/ubuntu/workspaces/isaac_ros-dev/working_principles.md)
+- **主入口指南**：[Readme.md](Readme.md)
+- **一鍵啟動 (Tmux 腳本)**：[launcher_guide.md](launcher_guide.md)
+- **自主探索與避障原理**：[working_principles.md](working_principles.md)
 
 ---
 
 ## 1. 設定檔參數詳解
 
-開啟 [robot_params.yaml](file:///home/ubuntu/workspaces/isaac_ros-dev/robot_params.yaml)：
+開啟 [robot_params.yaml](robot_params.yaml)：
 
 ```yaml
 robot:
@@ -39,7 +39,7 @@ simulation:
 
 #### A. 機器人物理與硬體設定 (`robot`)
 - **`radius`** (預設 `0.22`)：機器人本身的旋轉半徑。會被動態注入至 Nav2 代價地圖 (Costmap) 作為碰撞半徑，以及自主探索 node 作為邊界檢索膨脹半徑。若調得過小，機器人可能會擦撞牆壁；過大則會使機器人不敢進入狹窄的門口。
-- **`chassis_port` & `lidar_port`**：通訊埠路徑。配合 [udev-rules.md](file:///home/ubuntu/setup_data/udev-rules.md) 將硬體符號連結別名填寫於此。
+- **`chassis_port` & `lidar_port`**：通訊埠路徑。配合 [udev-rules.md](udev-rules.md) 將硬體符號連結別名填寫於此。
 
 #### B. 導航參數 (`navigation`)
 - **`inflation_radius`** (預設 `0.75`)：膨脹半徑。地圖中牆壁障礙物周圍會生成此半徑範圍的致命/警告代價區。**建議值為機器人半徑的 2.5 ~ 3.5 倍**。若機器人行進時常因靠近牆壁而頻繁重新規劃 (Replanning)，可適度調小此值。

@@ -5,9 +5,9 @@
 ---
 
 ## 🗺️ 相關文件連結
-- **主入口指南**：[Readme.md](file:///home/ubuntu/workspaces/isaac_ros-dev/Readme.md)
-- **一鍵啟動 (Tmux 腳本)**：[launcher_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/launcher_guide.md) （推薦使用，免去手動開啟多個視窗的繁瑣步驟）
-- **裝置掛載說明**：[docker_device_connection.md](file:///home/ubuntu/workspaces/isaac_ros-dev/docker_device_connection.md)
+- **主入口指南**：[Readme.md](Readme.md)
+- **一鍵啟動 (Tmux 腳本)**：[launcher_guide.md](launcher_guide.md) （推薦使用，免去手動開啟多個視窗的繁瑣步驟）
+- **裝置掛載說明**：[docker_device_connection.md](docker_device_connection.md)
 
 ---
 

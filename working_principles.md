@@ -5,9 +5,9 @@
 ---
 
 ## 🗺️ 相關文件連結
-- **主入口指南**：[Readme.md](file:///home/ubuntu/workspaces/isaac_ros-dev/Readme.md)
-- **Web 介面操作說明**：[web_control_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/web_control_guide.md)
-- **參數設定檔指南**：[config_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/config_guide.md)
+- **主入口指南**：[Readme.md](Readme.md)
+- **Web 介面操作說明**：[web_control_guide.md](web_control_guide.md)
+- **參數設定檔指南**：[config_guide.md](config_guide.md)
 
 ---
 

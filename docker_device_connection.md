@@ -6,7 +6,7 @@
 
 ## 📋 1. Host 端裝置驗證
 
-在進行掛載前，請確認 Host 端已套用 [udev-rules.md](file:///home/ubuntu/setup_data/udev-rules.md) 規則，且裝置正常連結：
+在進行掛載前，請確認 Host 端已套用 [udev-rules.md](udev-rules.md) 規則，且裝置正常連結：
 
 ```bash
 ls -l /dev/sllidar_a2m12 /dev/playrobot_base
@@ -22,7 +22,7 @@ ls -l /dev/sllidar_a2m12 /dev/playrobot_base
 如果您不想中斷、重新編譯或刪除目前正在運行的容器，可以使用動態掛載腳本。
 
 ### 🚀 腳本使用範例
-我們可以使用工作空間底下的 [attach_devices.sh](file:///home/ubuntu/workspaces/isaac_ros-dev/attach_devices.sh) 腳本。該腳本支援透過引數傳入多個裝置路徑：
+我們可以使用工作空間底下的 [attach_devices.sh](attach_devices.sh) 腳本。該腳本支援透過引數傳入多個裝置路徑：
 
 ```bash
 # 切換到工作空間
@@ -59,7 +59,7 @@ docker exec -u root isaac_ros_dev_container chmod 666 /dev/playrobot_base
 
 若要讓每次重新建立容器時都自動掛載這些裝置，可以直接修改容器的初始化與啟動腳本。
 
-1. 開啟 [install.sh](file:///home/ubuntu/setup_data/isaac-ros-jetson-thor-jazzy-install/install.sh)。
+1. 開啟 [install.sh](isaac-ros-jetson-thor-jazzy-install/install.sh)。
 2. 尋找 `start_container()` 函式（約在第 136-150 行）。
 3. 將 `/dev/sllidar_a2m12` 與 `/dev/playrobot_base` 新增至掛載循環中：
 

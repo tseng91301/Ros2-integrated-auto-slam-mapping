@@ -13,12 +13,12 @@
 | 順序 | 指南名稱 | 內容說明 | 連結檔案路徑 |
 | :---: | :--- | :--- | :--- |
 | **0** | **🔌 Host 本機安裝與部署** | 剛拿到機器人的本機驅動安裝與容器初始化步驟 | [../../setup_data/Readme.md](file:///home/ubuntu/setup_data/Readme.md) |
-| **1** | **🐳 Docker 裝置掛載與串接** | 如何動態或靜態地將雷達與底盤硬體節點掛載至 Docker 容器內 | [docker_device_connection.md](file:///home/ubuntu/workspaces/isaac_ros-dev/docker_device_connection.md) |
-| **2** | **💻 ROS 2 常用指令與環境準備** | 進入 Docker 容器、工作空間編譯、手動運行單一節點與 GUI (X11) 顯示設定 | [ros2_commands_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/ros2_commands_guide.md) |
-| **3** | **⚡ 一鍵啟動 (Tmux 腳本說明)** | 使用 `ros2_tmux_launcher.sh` 腳本一鍵部署實體/模擬遙控與探索 | [launcher_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/launcher_guide.md) |
-| **4** | **🌐 Web 網頁控制與實時建圖** | 手機/電腦瀏覽器遠端搖桿遙控、地圖下載、地圖重置與 UI 介面說明 | [web_control_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/web_control_guide.md) |
-| **5** | **🧭 邊界自主探索與避障原理** | 基於 Frontier-Based Clustering & APF 避障的四階段自動建圖演算法運作機制 | [working_principles.md](file:///home/ubuntu/workspaces/isaac_ros-dev/working_principles.md) |
-| **6** | **⚙️ 參數設定檔使用指南** | 解釋 `robot_params.yaml` 對底盤、雷達、導航、避障、與模擬參數的動態映射 | [config_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/config_guide.md) |
+| **1** | **🐳 Docker 裝置掛載與串接** | 如何動態或靜態地將雷達與底盤硬體節點掛載至 Docker 容器內 | [docker_device_connection.md](docker_device_connection.md) |
+| **2** | **💻 ROS 2 常用指令與環境準備** | 進入 Docker 容器、工作空間編譯、手動運行單一節點與 GUI (X11) 顯示設定 | [ros2_commands_guide.md](ros2_commands_guide.md) |
+| **3** | **⚡ 一鍵啟動 (Tmux 腳本說明)** | 使用 `ros2_tmux_launcher.sh` 腳本一鍵部署實體/模擬遙控與探索 | [launcher_guide.md](launcher_guide.md) |
+| **4** | **🌐 Web 網頁控制與實時建圖** | 手機/電腦瀏覽器遠端搖桿遙控、地圖下載、地圖重置與 UI 介面說明 | [web_control_guide.md](web_control_guide.md) |
+| **5** | **🧭 邊界自主探索與避障原理** | 基於 Frontier-Based Clustering & APF 避障的四階段自動建圖演算法運作機制 | [working_principles.md](working_principles.md) |
+| **6** | **⚙️ 參數設定檔使用指南** | 解釋 `robot_params.yaml` 對底盤、雷達、導航、避障、與模擬參數的動態映射 | [config_guide.md](config_guide.md) |
 
 ---
 

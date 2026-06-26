@@ -5,9 +5,9 @@
 ---
 
 ## 🗺️ 相關文件連結
-- **主入口指南**：[Readme.md](file:///home/ubuntu/workspaces/isaac_ros-dev/Readme.md)
-- **手動操作與常用指令**：[ros2_commands_guide.md](file:///home/ubuntu/workspaces/isaac_ros-dev/ros2_commands_guide.md)
-- **裝置掛載說明**：[docker_device_connection.md](file:///home/ubuntu/workspaces/isaac_ros-dev/docker_device_connection.md)
+- **主入口指南**：[Readme.md](Readme.md)
+- **手動操作與常用指令**：[ros2_commands_guide.md](ros2_commands_guide.md)
+- **裝置掛載說明**：[docker_device_connection.md](docker_device_connection.md)
 
 ---
 
