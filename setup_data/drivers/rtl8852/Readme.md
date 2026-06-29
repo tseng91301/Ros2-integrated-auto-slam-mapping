@@ -1,0 +1,1 @@
+* Install them by copying them into `/lib/firmware/rtl_bt`, then reboot the device.
