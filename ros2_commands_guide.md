@@ -123,3 +123,12 @@ ros2 run wheeltec_robot_keyboard wheeltec_keyboard
   # 重置 SLAM Toolbox 建圖
   ros2 service call /slam_toolbox/reset std_srvs/srv/Empty {}
   ```
+
+## ZED 相關的啟動方式
+```bash
+# 啟動 ZED 攝影機服務節點
+ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zedx
+
+# 啟動 ZED 攝影機視覺化工具 (ZED Rviz)
+ros2 launch zed_display_rviz2 display_zed_cam.launch.py camera_model:=zedx
+

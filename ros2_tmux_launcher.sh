@@ -5,7 +5,7 @@
 SESSION_NAME="ros2_dev"
 
 # 預設 GUI 顯示器位置 (若連線失敗，可視情況修改為 :0、:1 或 :1001)
-CONTAINER_DISPLAY=":1"
+CONTAINER_DISPLAY=":0"
 
 # 預設 ROS_DOMAIN_ID
 ROS_DOMAIN_ID_VAL="55"
@@ -154,11 +154,24 @@ else
     echo "ℹ️ 模擬模式已啟用，跳過硬體裝置掛載。"
 fi
 
-# 檢查是否需要啟動 GUI，如果是，先在 Host 本機端執行 xhost 授權 (避免在容器內報錯)
-if [[ " $@ " =~ " rviz " ]] || [[ " $@ " =~ " rviz2 " ]] || [[ " $@ " =~ " slam_all " ]] || [[ " $@ " =~ " sim_web_all " ]] || [[ " $@ " =~ " sim_explore " ]] || [[ " $@ " =~ " sim_keyboard " ]]; then
+# 檢查是否需要啟動 GUI 或可能呼叫 GPU/EGL 的交互終端，在 Host 本機端執行 xhost 授權 (避免在容器內報錯)
+if [[ " $@ " =~ " rviz " ]] || [[ " $@ " =~ " rviz2 " ]] || [[ " $@ " =~ " slam_all " ]] || [[ " $@ " =~ " sim_web_all " ]] || [[ " $@ " =~ " sim_explore " ]] || [[ " $@ " =~ " sim_keyboard " ]] || [[ " $@ " =~ " terminal " ]]; then
     echo "🖥️ 正在 Host 端授權 X11 顯示存取權 (xhost +local:docker)..."
-    xhost +local:docker 2>/dev/null || true
+    
+    # 確保在 ssh/tmux 等無 display 環境變數的終端下也能正確找到 X 伺服器進行授權
+    local_disp="${DISPLAY:-:0}"
+    local_auth="${XAUTHORITY:-}"
+    if [ -z "$local_auth" ]; then
+        if [ -f "/run/user/1000/gdm/Xauthority" ]; then
+            local_auth="/run/user/1000/gdm/Xauthority"
+        elif [ -f "$HOME/.Xauthority" ]; then
+            local_auth="$HOME/.Xauthority"
+        fi
+    fi
+    
+    DISPLAY="$local_disp" XAUTHORITY="$local_auth" xhost +local:docker 2>/dev/null || true
 fi
+
 
 # 3. 判斷是否需要清理先前還在運作的 tmux 會話與容器殘留進程
 # (terminal 模式預設不清理，除非指定了 -kill 參數)
@@ -177,16 +190,26 @@ if [ "$SHOULD_CLEAN" == "true" ]; then
     fi
 
     # 額外清理容器內可能殘留的 ROS 2 與 Python 節點進程 (避免佔用序列埠或 CPU)
-    # 注意：使用 rviz2 (不加 -f) 避免匹配到含 'rviz2' 參數的本腳本名稱，導致腳本被 self-kill
     echo "🧹 正在清理容器內可能殘留的舊節點進程..."
-    docker exec isaac_ros_dev_container pkill -9 -f [b]ase_control_node 2>/dev/null || true
-    docker exec isaac_ros_dev_container pkill -9 -f [b]in/ros2 2>/dev/null || true
-    docker exec isaac_ros_dev_container pkill -9 -f [j]oint_state_publisher 2>/dev/null || true
-    docker exec isaac_ros_dev_container pkill -9 -f [w]heeltec_keyboard 2>/dev/null || true
+    
+    # 1. 結束系統安裝與工作空間的所有 ROS 2 C++/Python 進程 (比對安裝與環境路徑)
+    docker exec isaac_ros_dev_container pkill -9 -f /opt/ros/ 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f /workspaces/isaac_ros-dev/install/ 2>/dev/null || true
+
+    # 2. 清理常見的組件容器、狀態發布器與相機驅動節點 (防止 ZED / Realsense 鎖定裝置)
+    docker exec isaac_ros_dev_container pkill -9 -f [c]omponent_container 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [r]obot_state_publisher 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [z]ed 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [r]ealsense 2>/dev/null || true
+
+    # 3. 清理模擬器、遙控器與通訊伺服器
+    docker exec isaac_ros_dev_container pkill -9 -f [w]heeltec 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 -f [w]eb_server 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 -f [g]z 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 -f [r]uby 2>/dev/null || true
+    docker exec isaac_ros_dev_container pkill -9 -f [t]ornado 2>/dev/null || true
     docker exec isaac_ros_dev_container pkill -9 rviz2 2>/dev/null || true
+    
     sleep 1
 else
     echo "ℹ️ 跳過清理舊進程與會話 (若要強制清理，請加上 -kill 參數)"
