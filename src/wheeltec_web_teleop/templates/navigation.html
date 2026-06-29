@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,7 +8,9 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         .nav-layout {
@@ -17,12 +20,14 @@
             margin-top: 1rem;
             height: calc(100vh - 120px);
         }
+
         @media (max-width: 1024px) {
             .nav-layout {
                 grid-template-columns: 1fr;
                 height: auto;
             }
         }
+
         .control-group {
             background: rgba(30, 41, 59, 0.35);
             backdrop-filter: blur(12px);
@@ -34,6 +39,7 @@
             flex-direction: column;
             gap: 1rem;
         }
+
         .control-group h3 {
             font-family: 'Orbitron', sans-serif;
             font-size: 0.95rem;
@@ -43,15 +49,18 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             padding-bottom: 0.5rem;
         }
+
         .btn-stack {
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
         }
+
         .btn-row {
             display: flex;
             gap: 0.75rem;
         }
+
         .nav-btn {
             padding: 0.75rem 1rem;
             border-radius: 8px;
@@ -69,39 +78,49 @@
             align-items: center;
             gap: 0.5rem;
         }
+
         .nav-btn:hover {
             background: rgba(255, 255, 255, 0.12);
         }
+
         .btn-primary {
-            background: rgba(245, 158, 11, 0.15); /* Amber */
+            background: rgba(245, 158, 11, 0.15);
+            /* Amber */
             border-color: rgba(245, 158, 11, 0.4);
             color: #f59e0b;
         }
+
         .btn-primary:hover {
             background: #f59e0b;
             color: #0f172a;
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.35);
         }
+
         .btn-warn {
-            background: rgba(6, 182, 212, 0.15); /* Cyan */
+            background: rgba(6, 182, 212, 0.15);
+            /* Cyan */
             border-color: rgba(6, 182, 212, 0.4);
             color: #06b6d4;
         }
+
         .btn-warn:hover {
             background: #06b6d4;
             color: #0f172a;
             box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
         }
+
         .btn-danger {
             background: rgba(239, 68, 68, 0.2);
             border-color: rgba(239, 68, 68, 0.5);
             color: #ef4444;
         }
+
         .btn-danger:hover {
             background: #ef4444;
             color: #ffffff;
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
         }
+
         .btn-estop-nav {
             padding: 1.25rem;
             font-size: 1.1rem;
@@ -111,16 +130,19 @@
             color: #ef4444;
             box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
         }
+
         .btn-estop-nav:hover {
             background: #ef4444;
             color: #ffffff;
             box-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
         }
+
         .select-group {
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
         }
+
         .select-group select {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -131,41 +153,51 @@
             font-size: 0.9rem;
             width: 100%;
         }
+
         .select-group select:focus {
             border-color: #f59e0b;
             outline: none;
         }
+
         .sidebar-scroll {
             height: 100%;
             overflow-y: auto;
             padding-right: 0.25rem;
         }
+
         /* Custom scrollbar */
         .sidebar-scroll::-webkit-scrollbar {
             width: 4px;
         }
+
         .sidebar-scroll::-webkit-scrollbar-track {
             background: transparent;
         }
+
         .sidebar-scroll::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 2px;
         }
+
         .monitor-panel {
             height: 100%;
             display: flex;
             flex-direction: column;
         }
+
         .map-container {
             flex-grow: 1;
             position: relative;
         }
+
         .text-amber {
             color: #f59e0b !important;
         }
+
         .text-cyan {
             color: #06b6d4 !important;
         }
+
         .btn-primary-hover:hover {
             border-color: #f59e0b;
             color: #f59e0b;
@@ -173,18 +205,25 @@
         }
     </style>
 </head>
+
 <body>
     <div class="stars-bg"></div>
-    
+
     <div class="app-container">
         <!-- HEADER / TELEMETRY HUD -->
         <header class="hud-header">
             <div class="hud-logo">
-                <a href="/" style="text-decoration: none; color: inherit;">
-                    <span class="logo-accent text-amber">THOR</span> NAVIGATOR
+                <span class="logo-accent text-amber">THOR</span> NAVIGATOR
+                <a href="/" class="hud-home-btn" title="Back to Portal">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        style="margin-right: 4px; vertical-align: middle;">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    PORTAL
                 </a>
             </div>
-            
+
             <div class="hud-telemetry">
                 <div class="tel-item">
                     <span class="tel-label">STATUS:</span>
@@ -216,7 +255,7 @@
                         <span class="terminal-text">SYS.NAVIGATION.MONITOR</span>
                         <div class="monitor-resolution" id="map-telemetry">Map: Waiting...</div>
                     </div>
-                    
+
                     <div class="map-container">
                         <canvas id="map-canvas"></canvas>
                         <div class="map-overlay-grid"></div>
@@ -254,16 +293,27 @@
                     <h3>NAV CONTROLLER</h3>
                     <div class="btn-stack">
                         <button class="nav-btn btn-primary" id="btn-start-nav">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
                             START NAVIGATION
                         </button>
                         <div class="btn-row">
                             <button class="nav-btn btn-warn" id="btn-pause-nav" style="flex: 1;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="6" y="4" width="4" height="16"></rect>
+                                    <rect x="14" y="4" width="4" height="16"></rect>
+                                </svg>
                                 PAUSE
                             </button>
                             <button class="nav-btn btn-danger" id="btn-clear-target" style="flex: 1;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
                                 CLEAR
                             </button>
                         </div>
@@ -271,7 +321,8 @@
                 </div>
 
                 <!-- EMERGENCY TERMINATION -->
-                <div class="control-group" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.25);">
+                <div class="control-group"
+                    style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.25);">
                     <button class="nav-btn btn-estop-nav" id="btn-estop-nav">
                         EMERGENCY STOP
                     </button>
@@ -279,8 +330,9 @@
             </aside>
         </div>
     </div>
-    
+
     <script src="/static/js/map_canvas.js"></script>
     <script src="/static/js/navigation.js"></script>
 </body>
+
 </html>
