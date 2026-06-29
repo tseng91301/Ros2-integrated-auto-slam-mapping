@@ -17,5 +17,12 @@ def generate_launch_description():
             name='web_teleop_node',
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}]
+        ),
+        Node(
+            package='wheeltec_web_teleop',
+            executable='trajectory_tracker',
+            name='trajectory_tracker_node',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}]
         )
     ])

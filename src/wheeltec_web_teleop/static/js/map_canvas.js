@@ -73,6 +73,9 @@ class MapCanvas {
         this.centroids = [];
         this.target = null;
 
+        // Trajectory state
+        this.trajectory = [];
+
         // Offscreen cache canvas
         this.offscreenCanvas = document.createElement('canvas');
         this.offscreenCtx = this.offscreenCanvas.getContext('2d');
@@ -200,6 +203,15 @@ class MapCanvas {
     }
 
     /**
+     * Updates the robot trajectory list.
+     * @param {Array} trajectoryData - Array of [x, y, speed] elements.
+     */
+    updateTrajectory(trajectoryData) {
+        this.trajectory = trajectoryData || [];
+        this.draw();
+    }
+
+    /**
      * Resets the viewport zoom and pans map to center.
      */
     resetView() {
@@ -263,6 +275,9 @@ class MapCanvas {
 
         // Draw cached map
         this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+
+        // Draw trajectory path
+        this.drawTrajectory();
 
         // Draw exploration features (centroids & target)
         this.drawExplorationFeatures();
@@ -340,6 +355,42 @@ class MapCanvas {
             this.ctx.lineWidth = 1.5 / this.zoom;
             this.ctx.stroke();
         }
+    }
+
+    /**
+     * Draws the colored robot trajectory path.
+     */
+    drawTrajectory() {
+        if (!this.trajectory || this.trajectory.length < 2) return;
+
+        this.ctx.save();
+        this.ctx.lineWidth = 3 / this.zoom; // Constant thickness on screen
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        for (let i = 1; i < this.trajectory.length; i++) {
+            const p1 = this.trajectory[i - 1];
+            const p2 = this.trajectory[i];
+
+            const x1 = (p1[0] - this.originX) / this.resolution;
+            const y1 = this.mapHeight - 1 - (p1[1] - this.originY) / this.resolution;
+            const x2 = (p2[0] - this.originX) / this.resolution;
+            const y2 = this.mapHeight - 1 - (p2[1] - this.originY) / this.resolution;
+
+            const speed = p2[2];
+            const maxSpeed = 0.5; // Normal speed limit
+            const ratio = Math.min(speed / maxSpeed, 1.0);
+            
+            // Map ratio to hue: 240 (blue) -> 120 (green) -> 0 (red)
+            const hue = (1.0 - ratio) * 240;
+            this.ctx.strokeStyle = `hsl(${hue}, 100%, 60%)`;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(x1, y1);
+            this.ctx.lineTo(x2, y2);
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
     }
 
     /**

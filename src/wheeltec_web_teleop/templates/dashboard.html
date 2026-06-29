@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thor Robot Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Unified Dashboard Custom Styles */
+        .hud-modes {
+            display: flex;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 30px;
+            padding: 3px;
+            gap: 4px;
+        }
+
+        .btn-mode {
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            padding: 6px 18px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-mode:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-mode.active[data-mode="teleop"] {
+            background: rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+        }
+
+        .btn-mode.active[data-mode="explorer"] {
+            background: rgba(6, 182, 212, 0.2);
+            color: #06b6d4;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+        }
+
+        .btn-mode.active[data-mode="navigation"] {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+        }
+
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 240px 1.5fr 340px;
+            gap: 1.5rem;
+            margin-top: 0.5rem;
+            height: calc(100vh - 120px);
+            min-height: 0;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .dashboard-layout.two-cols {
+            grid-template-columns: 1.5fr 340px;
+            gap: 1.5rem;
+        }
+
+        .dashboard-layout.two-cols .left-grip {
+            display: none !important;
+        }
+
+        .control-group {
+            background: rgba(30, 41, 59, 0.35);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .control-group h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            margin: 0;
+            color: #ffffff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.4rem;
+        }
+
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        .nav-btn {
+            padding: 0.7rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .btn-primary {
+            background: rgba(6, 182, 212, 0.15);
+            border-color: rgba(6, 182, 212, 0.4);
+            color: #06b6d4;
+        }
+
+        .btn-primary:hover {
+            background: #06b6d4;
+            color: #0f172a;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+        }
+
+        .btn-warn {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #f59e0b;
+        }
+
+        .btn-warn:hover {
+            background: #f59e0b;
+            color: #0f172a;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.35);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+
+        .btn-danger:hover {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+
+        .select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .select-group select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: #ffffff;
+            padding: 0.6rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .select-group select:focus {
+            border-color: #06b6d4;
+            outline: none;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .input-group input {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: #ffffff;
+            padding: 0.5rem;
+            width: 70px;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+        }
+
+        .input-group input:focus {
+            border-color: #06b6d4;
+            outline: none;
+        }
+
+        .sidebar-scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        .monitor-panel {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .text-amber {
+            color: #f59e0b !important;
+        }
+
+        .text-cyan {
+            color: #06b6d4 !important;
+        }
+
+        .text-green {
+            color: #22c55e !important;
+        }
+
+        .text-red {
+            color: #ef4444 !important;
+        }
+
+        .btn-primary-hover:hover {
+            border-color: #f59e0b;
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .dashboard-layout.two-cols {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="stars-bg"></div>
+
+    <div class="app-container" id="app-root-container" data-initial-mode="{{ initial_mode }}">
+        <!-- HEADER / TELEMETRY HUD -->
+        <header class="hud-header">
+            <div class="hud-logo" style="display: flex; align-items: center; gap: 16px;">
+                <span class="logo-accent">THOR</span> CONSOLE
+                <a href="/" class="hud-home-btn" title="Back to Portal">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        style="margin-right: 4px; vertical-align: middle;">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    PORTAL
+                </a>
+            </div>
+
+            <!-- MODE SWITCHER NAVIGATION BAR -->
+            <div class="hud-modes">
+                <button class="btn-mode active" data-mode="teleop" id="btn-mode-teleop">🎮 MANUAL</button>
+                <button class="btn-mode" data-mode="explorer" id="btn-mode-explorer">🧭 EXPLORER</button>
+                <button class="btn-mode" data-mode="navigation" id="btn-mode-navigation">🚀 NAVIGATE</button>
+            </div>
+
+            <!-- DYNAMIC MODE-SPECIFIC TELEMETRY HUD -->
+            <!-- 1. MANUAL MODE HUD -->
+            <div class="hud-telemetry" id="telemetry-teleop">
+                <div class="tel-item">
+                    <span class="tel-label">LINEAR VEL:</span>
+                    <span class="tel-value" id="val-vx">0.00 m/s</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">ANGULAR VEL:</span>
+                    <span class="tel-value" id="val-wz">0.00 rad/s</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">MAX LINEAR:</span>
+                    <span class="tel-value text-cyan" id="val-limit-linear">0.50 m/s</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">MAX ANGULAR:</span>
+                    <span class="tel-value text-purple" id="val-limit-angular">1.00 rad/s</span>
+                </div>
+            </div>
+
+            <!-- 2. EXPLORER MODE HUD -->
+            <div class="hud-telemetry hidden" id="telemetry-explorer">
+                <div class="tel-item">
+                    <span class="tel-label">STATUS:</span>
+                    <span class="tel-value text-cyan" id="val-explore-status">PAUSED</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">ACTIVE GOAL:</span>
+                    <span class="tel-value" id="val-explore-goal">None</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">LAP PROGRESS:</span>
+                    <span class="tel-value text-purple" id="val-explore-laps">1 / 1</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">FRONTIERS:</span>
+                    <span class="tel-value" id="val-explore-frontiers">0 clusters</span>
+                </div>
+            </div>
+
+            <!-- 3. NAVIGATION MODE HUD -->
+            <div class="hud-telemetry hidden" id="telemetry-navigation">
+                <div class="tel-item">
+                    <span class="tel-label">STATUS:</span>
+                    <span class="tel-value text-amber" id="val-nav-status">IDLE</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">TARGET POINT:</span>
+                    <span class="tel-value" id="val-nav-target">None</span>
+                </div>
+                <div class="tel-item">
+                    <span class="tel-label">ROBOT POSE:</span>
+                    <span class="tel-value text-cyan" id="val-nav-pose">Waiting...</span>
+                </div>
+            </div>
+
+            <!-- STATUS AND COLLISION INDICATOR -->
+            <div class="hud-status-group" style="display: flex; align-items: center; gap: 16px;">
+                <div class="hud-collision-alert hidden" id="collision-alert">
+                    <span class="alert-icon">⚠️</span>
+                    <span class="alert-text">COLLISION</span>
+                    <span class="alert-sectors" id="collision-sectors"></span>
+                </div>
+                <div class="hud-status">
+                    <div class="status-indicator offline" id="status-dot"></div>
+                    <span class="status-text" id="status-text">OFFLINE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT GRID -->
+        <main class="dashboard-layout" id="main-layout">
+
+            <!-- LEFT PANEL: LINEAR CONTROL GRIP (Visible in manual mode only) -->
+            <section class="grip-panel left-grip" id="panel-left-grip">
+                <div class="grip-header">
+                    <h2>LINEAR CONTROL</h2>
+                    <div class="control-switch-container">
+                        <label class="switch-label">JOYSTICK</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-left-control">
+                            <span class="slider"></span>
+                        </label>
+                        <label class="switch-label">D-PAD</label>
+                    </div>
+                </div>
+
+                <div class="controller-viewport">
+                    <!-- Joystick Container -->
+                    <div class="joystick-wrapper" id="left-joystick-container">
+                        <div class="joystick-ring">
+                            <div class="joystick-handle" id="left-joystick-handle"></div>
+                            <div class="axis-guide x-axis"></div>
+                            <div class="axis-guide y-axis"></div>
+                        </div>
+                    </div>
+
+                    <!-- Button D-Pad Container -->
+                    <div class="dpad-wrapper hidden" id="left-dpad">
+                        <div class="dpad-grid">
+                            <div></div>
+                            <button class="dpad-btn btn-up" id="btn-linear-forward" title="Forward">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7 14l5-5 5 5z" />
+                                </svg>
+                            </button>
+                            <div></div>
+
+                            <button class="dpad-btn btn-left" id="btn-linear-left" title="Strafe Left">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M14 7l-5 5 5 5z" />
+                                </svg>
+                            </button>
+                            <button class="dpad-btn btn-center" id="btn-linear-stop" title="Stop">
+                                <div class="stop-inner"></div>
+                            </button>
+                            <button class="dpad-btn btn-right" id="btn-linear-right" title="Strafe Right">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M10 17l5-5-5-5z" />
+                                </svg>
+                            </button>
+
+                            <div></div>
+                            <button class="dpad-btn btn-down" id="btn-linear-backward" title="Backward">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7 10l5 5 5-5z" />
+                                </svg>
+                            </button>
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grip-footer">
+                    <span class="sub-label" id="left-mode-indicator">Mode: Non-Holonomic</span>
+                </div>
+            </section>
+
+            <!-- CENTER MONITOR (MAP SCREEN) -->
+            <section class="monitor-panel" id="panel-center-monitor">
+                <div class="monitor-screen" style="height: 100%; display: flex; flex-direction: column;">
+                    <div class="scanlines"></div>
+                    <div class="monitor-header-bar">
+                        <span class="terminal-text" id="map-title-terminal">SYS.MAP.ACTIVE - SLAM_TOOLBOX</span>
+                        <div class="monitor-resolution" id="map-telemetry">Map: Waiting...</div>
+                    </div>
+
+                    <div class="map-container">
+                        <canvas id="map-canvas"></canvas>
+                        <div class="map-overlay-grid"></div>
+                        <div class="map-controls">
+                            <button class="map-ctrl-btn" id="btn-zoom-in" title="Zoom In">+</button>
+                            <button class="map-ctrl-btn" id="btn-zoom-out" title="Zoom Out">-</button>
+                            <button class="map-ctrl-btn" id="btn-zoom-reset" title="Reset View">⟲</button>
+                        </div>
+                        <div class="map-loading" id="map-placeholder">
+                            <div class="radar-sweep"></div>
+                            <span class="pulse-text" id="map-loading-text">CONNECTING TO ROS2 ENVIRONMENT...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: CONTROLS SIDEBAR -->
+            <aside class="sidebar-scroll" id="panel-right-sidebar">
+
+                <!-- 1. MANUAL CONTROL SIDEBAR -->
+                <div id="sidebar-teleop" class="mode-sidebar">
+                    <!-- ANGULAR CONTROL GRIP -->
+                    <div class="grip-panel right-grip"
+                        style="box-shadow: none; border: none; background: transparent; padding: 0; margin-bottom: 1.25rem;">
+                        <div class="grip-header" style="padding-bottom: 8px; margin-bottom: 8px;">
+                            <h2>ANGULAR CONTROL</h2>
+                            <div class="control-switch-container">
+                                <label class="switch-label">JOYSTICK</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-right-control">
+                                    <span class="slider"></span>
+                                </label>
+                                <label class="switch-label">D-PAD</label>
+                            </div>
+                        </div>
+
+                        <div class="controller-viewport" style="height: 160px; min-height: 0;">
+                            <!-- Joystick Container -->
+                            <div class="joystick-wrapper" id="right-joystick-container">
+                                <div class="joystick-ring">
+                                    <div class="joystick-handle" id="right-joystick-handle"></div>
+                                    <div class="axis-guide x-axis"></div>
+                                    <div class="axis-guide y-axis"></div>
+                                </div>
+                            </div>
+
+                            <!-- Button D-Pad Container -->
+                            <div class="dpad-wrapper hidden" id="right-dpad">
+                                <div class="dpad-grid">
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+
+                                    <button class="dpad-btn btn-left" id="btn-turn-left" title="Rotate Left">
+                                        <svg viewBox="0 0 24 24">
+                                            <path
+                                                d="M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                                        </svg>
+                                    </button>
+                                    <button class="dpad-btn btn-center" id="btn-angular-stop" title="Stop rotation">
+                                        <div class="stop-inner"></div>
+                                    </button>
+                                    <button class="dpad-btn btn-right" id="btn-turn-right" title="Rotate Right">
+                                        <svg viewBox="0 0 24 24">
+                                            <path
+                                                d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
+                                        </svg>
+                                    </button>
+
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SLIDERS -->
+                    <div class="control-group">
+                        <h3>SPEED MULTIPLIERS</h3>
+                        <div class="slider-row">
+                            <label>LINEAR (X/Y)</label>
+                            <input type="range" id="slider-linear" min="0.1" max="1.5" step="0.05" value="0.5">
+                            <span class="slider-val" id="val-slider-linear">0.50</span>
+                        </div>
+                        <div class="slider-row">
+                            <label>ANGULAR (Z)</label>
+                            <input type="range" id="slider-angular" min="0.1" max="2.5" step="0.05" value="1.0">
+                            <span class="slider-val" id="val-slider-angular">1.00</span>
+                        </div>
+                    </div>
+
+                    <!-- DRIVE MODES -->
+                    <div class="control-group">
+                        <h3>DRIVE SETTINGS</h3>
+                        <div class="mode-toggles">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="check-holonomic">
+                                <span class="checkmark"></span>
+                                Enable Holonomic Mode
+                            </label>
+                        </div>
+                        <div class="help-section" style="margin-top: 8px; padding-top: 8px;">
+                            <span class="help-toggle" id="help-toggle">⌨️ Keyboard Guidelines</span>
+                        </div>
+                    </div>
+
+                    <!-- SLAM MAP MANAGEMENT -->
+                    <div class="control-group">
+                        <h3>MAP MANAGEMENT</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn btn-primary" id="btn-save-robot-teleop">
+                                SAVE MAP (ROBOT)
+                            </button>
+                            <button class="nav-btn btn-danger btn-danger-hover" id="btn-reset-map-teleop">
+                                RESET SLAM MAP
+                            </button>
+                            <div class="btn-row">
+                                <button class="nav-btn" id="btn-download-png-teleop"
+                                    style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                    MAP PNG
+                                </button>
+                                <button class="nav-btn" id="btn-download-ros-teleop"
+                                    style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                    MAP ROS ZIP
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TRAJECTORY CARD -->
+                    <div class="control-group">
+                        <h3>TRAJECTORY</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn" id="btn-download-trajectory-teleop">
+                                DOWNLOAD TRAJECTORY
+                            </button>
+                            <button class="nav-btn btn-danger btn-danger-hover" id="btn-reset-trajectory-teleop">
+                                RESET TRAJECTORY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. AUTO EXPLORER SIDEBAR -->
+                <div id="sidebar-explorer" class="mode-sidebar hidden">
+                    <div class="control-group">
+                        <h3>EXPLORATION CONTROL</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn btn-primary" id="btn-start-explore">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                START EXPLORATION
+                            </button>
+                            <div class="btn-row">
+                                <button class="nav-btn btn-warn" id="btn-pause-explore" style="flex: 1;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="6" y="4" width="4" height="16"></rect>
+                                        <rect x="14" y="4" width="4" height="16"></rect>
+                                    </svg>
+                                    PAUSE
+                                </button>
+                                <button class="nav-btn btn-primary" id="btn-resume-explore" style="flex: 1;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                    RESUME
+                                </button>
+                            </div>
+                            <button class="nav-btn" id="btn-reset-explore">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                                </svg>
+                                RESET EXPLORATOR
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>LOOP SETTINGS</h3>
+                        <div class="input-group">
+                            <label for="lap-input" style="font-size: 0.85rem; color: #9ca3af; flex-grow: 1;">Exploration
+                                Laps:</label>
+                            <input type="number" id="lap-input" min="1" max="10" value="1">
+                            <button class="nav-btn btn-primary" id="btn-set-laps"
+                                style="padding: 0.5rem 1rem;">SET</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>SLAM MAP MANAGEMENT</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn btn-primary" id="btn-save-robot-explore">
+                                SAVE MAP (ROBOT)
+                            </button>
+                            <button class="nav-btn btn-danger btn-danger-hover" id="btn-reset-map-explore">
+                                RESET SLAM MAP
+                            </button>
+                            <div class="btn-row">
+                                <button class="nav-btn" id="btn-download-png-explore"
+                                    style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                    DOWNLOAD PNG
+                                </button>
+                                <button class="nav-btn" id="btn-download-ros-explore"
+                                    style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.75rem;">
+                                    DOWNLOAD ZIP
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>TRAJECTORY</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn" id="btn-download-trajectory-explore">
+                                DOWNLOAD TRAJECTORY
+                            </button>
+                            <button class="nav-btn btn-danger btn-danger-hover" id="btn-reset-trajectory-explore">
+                                RESET TRAJECTORY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. AUTO NAVIGATION SIDEBAR -->
+                <div id="sidebar-navigation" class="mode-sidebar hidden">
+                    <div class="control-group">
+                        <h3>MAP SELECTOR</h3>
+                        <div class="select-group">
+                            <label for="map-select" style="font-size: 0.85rem; color: #9ca3af;">Select Map:</label>
+                            <select id="map-select">
+                                <option value="">-- No Maps Found --</option>
+                            </select>
+                            <button class="nav-btn btn-primary" id="btn-load-map"
+                                style="margin-top: 0.5rem; width: 100%;">
+                                LOAD STATIC MAP
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>NAV CONTROLLER</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn btn-primary" id="btn-start-nav">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                START NAVIGATION
+                            </button>
+                            <div class="btn-row">
+                                <button class="nav-btn btn-warn" id="btn-pause-nav" style="flex: 1;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="6" y="4" width="4" height="16"></rect>
+                                        <rect x="14" y="4" width="4" height="16"></rect>
+                                    </svg>
+                                    PAUSE
+                                </button>
+                                <button class="nav-btn btn-danger" id="btn-clear-target" style="flex: 1;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                    CLEAR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>TRAJECTORY</h3>
+                        <div class="btn-stack">
+                            <button class="nav-btn" id="btn-download-trajectory-nav">
+                                DOWNLOAD TRAJECTORY
+                            </button>
+                            <button class="nav-btn btn-danger btn-danger-hover" id="btn-reset-trajectory-nav">
+                                RESET TRAJECTORY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PERSISTENT EMERGENCY STOP -->
+                <div class="control-group card-estop"
+                    style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.25); height: 80px; margin-top: 1rem;">
+                    <button class="estop-btn" id="btn-estop-global">
+                        <span>EMERGENCY</span>
+                        <span>STOP</span>
+                    </button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Keyboard help modal -->
+    <div class="modal-overlay hidden" id="help-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Keyboard Remote Guidelines</h2>
+                <button class="close-btn" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="kbd-layout">
+                    <div class="kbd-row">
+                        <span class="kbd-key">U</span>
+                        <span class="kbd-key">I</span>
+                        <span class="kbd-key">O</span>
+                    </div>
+                    <div class="kbd-row">
+                        <span class="kbd-key">J</span>
+                        <span class="kbd-key">K</span>
+                        <span class="kbd-key">L</span>
+                    </div>
+                    <div class="kbd-row">
+                        <span class="kbd-key">M</span>
+                        <span class="kbd-key">,</span>
+                        <span class="kbd-key">.</span>
+                    </div>
+                </div>
+                <div class="kbd-details">
+                    <p><strong>I / ,</strong> : Forward / Backward</p>
+                    <p><strong>J / L</strong> : Rotate Left / Rotate Right</p>
+                    <p><strong>U / O</strong> : Curved Forward-Left / Forward-Right</p>
+                    <p><strong>M / .</strong> : Curved Backward-Left / Backward-Right</p>
+                    <p><strong>K or Space</strong> : Immediate STOP</p>
+                    <hr>
+                    <p><strong>Shift + Keyboard (U, I, O, J, L, M, &lt;, &gt;)</strong> : Holonomic slide mode (strafing
+                        lateral movement instead of rotating)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/map_canvas.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+
+</html>

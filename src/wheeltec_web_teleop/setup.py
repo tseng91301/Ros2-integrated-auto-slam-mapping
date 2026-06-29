@@ -29,7 +29,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'web_server = wheeltec_web_teleop.web_server:main'
+            'web_server = wheeltec_web_teleop.web_server:main',
+            'trajectory_tracker = wheeltec_web_teleop.trajectory_tracker:main'
         ],
     },
 )

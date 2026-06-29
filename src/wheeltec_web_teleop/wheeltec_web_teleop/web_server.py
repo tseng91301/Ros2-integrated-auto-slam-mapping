@@ -26,6 +26,9 @@ from ament_index_python.packages import get_package_share_directory
 from slam_toolbox.srv import Reset
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
+from std_srvs.srv import Trigger
+import asyncio
+import time
 
 # Global variables to store the node and active web socket clients
 ros_node = None
@@ -34,6 +37,7 @@ latest_map_data = None  # Cache for map updates
 latest_markers_data = None  # Cache for exploration markers
 latest_status_data = None  # Cache for exploration status
 latest_nav_map_data = None  # Cache for static navigation map
+latest_trajectory_data = None  # Cache for robot trajectory
 main_loop = None  # Main thread's Tornado IOLoop
 
 def get_map_dir():
@@ -190,6 +194,21 @@ class TeleopNode(Node):
             self.status_callback,
             10
         )
+        
+        # Subscriber for robot trajectory updates
+        self.latest_trajectory = None
+        self.sub_trajectory = self.create_subscription(
+            String,
+            '/robot_trajectory',
+            self.trajectory_callback,
+            10
+        )
+        
+        # Client for exporting trajectory
+        self.export_cli = self.create_client(Trigger, '/export_trajectory')
+        
+        # Client for resetting trajectory
+        self.reset_trajectory_cli = self.create_client(Trigger, '/reset_trajectory')
         
         # Transform listener to query robot pose
         self.tf_buffer = Buffer()
@@ -377,6 +396,18 @@ class TeleopNode(Node):
             safe_broadcast(latest_status_data)
         except Exception as e:
             pass
+
+    def trajectory_callback(self, msg):
+        global latest_trajectory_data
+        try:
+            pts = json.loads(msg.data)
+            latest_trajectory_data = pts
+            safe_broadcast({
+                "type": "trajectory",
+                "data": pts
+            })
+        except Exception as e:
+            self.get_logger().error(f"Error in trajectory_callback: {str(e)}")
 
     def update_robot_pose(self):
         global websocket_clients
@@ -708,17 +739,17 @@ class MainHandler(tornado.web.RequestHandler):
 class TeleopHandler(tornado.web.RequestHandler):
     """Serves the Manual Teleop interface."""
     def get(self):
-        self.render("teleop.html")
+        self.render("dashboard.html", initial_mode="teleop")
 
 class ExplorerHandler(tornado.web.RequestHandler):
     """Serves the Autonomous Exploration monitor interface."""
     def get(self):
-        self.render("explorer.html")
+        self.render("dashboard.html", initial_mode="explorer")
 
 class NavigationHandler(tornado.web.RequestHandler):
     """Serves the Auto Navigation interface."""
     def get(self):
-        self.render("navigation.html")
+        self.render("dashboard.html", initial_mode="navigation")
 
 class ListMapsHandler(tornado.web.RequestHandler):
     """API endpoint to list maps on the server."""
@@ -759,6 +790,13 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         # Immediately send cached status data if available
         if latest_status_data is not None:
             self.write_message(json.dumps(latest_status_data))
+        # Immediately send cached trajectory data if available
+        global latest_trajectory_data
+        if latest_trajectory_data is not None:
+            self.write_message(json.dumps({
+                "type": "trajectory",
+                "data": latest_trajectory_data
+            }))
 
     def on_message(self, message):
         global latest_nav_map_data
@@ -853,6 +891,21 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                     "y": None,
                     "status": "IDLE"
                 })
+            elif msg_type == "reset_trajectory":
+                global latest_trajectory_data
+                latest_trajectory_data = []
+                # Call ROS 2 reset trajectory service
+                if ros_node.reset_trajectory_cli.service_is_ready():
+                    req = Trigger.Request()
+                    ros_node.reset_trajectory_cli.call_async(req)
+                else:
+                    ros_node.get_logger().warn("Reset trajectory service not ready. Fallback to CLI subprocess.")
+                    cmd = ["ros2", "service", "call", "/reset_trajectory", "std_srvs/srv/Trigger", "{}"]
+                    subprocess.Popen(cmd)
+                safe_broadcast({
+                    "type": "trajectory",
+                    "data": []
+                })
             elif msg_type == "start_nav":
                 if ros_node.nav_target is not None:
                     ros_node.start_navigation(ros_node.nav_target[0], ros_node.nav_target[1])
@@ -935,6 +988,44 @@ class DownloadMapHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write(f"Error saving map: {str(e)}")
 
+class DownloadTrajectoryHandler(tornado.web.RequestHandler):
+    async def get(self):
+        try:
+            # Call service
+            if not ros_node.export_cli.service_is_ready():
+                ready = ros_node.export_cli.wait_for_server(timeout_sec=1.0)
+                if not ready:
+                    self.set_status(503)
+                    self.write("Trajectory tracker service not available.")
+                    return
+            
+            req = Trigger.Request()
+            future = ros_node.export_cli.call_async(req)
+            
+            # Wait for future in Tornado async handler
+            start_time = time.time()
+            while not future.done() and (time.time() - start_time) < 3.0:
+                await asyncio.sleep(0.05)
+                
+            if not future.done():
+                self.set_status(504)
+                self.write("Timeout waiting for trajectory tracker service.")
+                return
+                
+            res = future.result()
+            if not res.success:
+                self.set_status(500)
+                self.write(f"Failed to export trajectory: {res.message}")
+                return
+                
+            self.set_header("Content-Type", "text/csv")
+            self.set_header("Content-Disposition", "attachment; filename=robot_trajectory.csv")
+            self.write(res.message)
+            
+        except Exception as e:
+            self.set_status(500)
+            self.write(f"Error: {str(e)}")
+
 def main():
     global ros_node, main_loop
     main_loop = tornado.ioloop.IOLoop.current()
@@ -957,6 +1048,7 @@ def main():
         (r"/navigation", NavigationHandler),
         (r"/ws", WSHandler),
         (r"/api/download_map", DownloadMapHandler),
+        (r"/api/download_trajectory", DownloadTrajectoryHandler),
         (r"/api/list_maps", ListMapsHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": static_path}),
     ], template_path=template_path)
