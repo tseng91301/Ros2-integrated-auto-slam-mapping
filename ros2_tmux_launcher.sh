@@ -115,11 +115,13 @@ show_help() {
     echo "    web           - Web teleop & real-time mapping server"
     echo "    explorer      - Frontier-based autonomous explorer node"
     echo "    rviz / rviz2  - RViz2 visualization tool (loads SLAM config)"
+    echo "    rosbag        - Rosbag2 recording tool (records mapping data)"
     echo ""
     echo "  Custom Examples:"
     echo "    $0 chassis lidar        (Launch chassis and LIDAR only)"
     echo "    $0 chassis keyboard rviz (Launch chassis, keyboard, and RViz2)"
     echo "    $0 chassis lidar slam web (Launch chassis, LIDAR, SLAM, and Web Server)"
+    echo "    $0 chassis lidar slam rviz rosbag (Launch mapping and record data)"
     echo ""
     exit 0
 }
@@ -454,6 +456,9 @@ for arg in "$@"; do
             ;;
         rviz|rviz2)
             commands+=("export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz")
+            ;;
+        rosbag)
+            commands+=("mkdir -p /workspaces/isaac_ros-dev/rosbags && ros2 bag record /scan /odom /odom_combined /tf /tf_static /cmd_vel /map -o /workspaces/isaac_ros-dev/rosbags/rosbag_\$(date +%Y%m%d_%H%M%S)")
             ;;
         *)
             echo "⚠️ 未知模組: $arg (將被忽略)"
