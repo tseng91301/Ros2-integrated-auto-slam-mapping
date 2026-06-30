@@ -174,13 +174,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
-
     // Bind tab clicks
     document.querySelectorAll('.btn-mode').forEach(btn => {
         btn.addEventListener('click', () => {
             switchMode(btn.getAttribute('data-mode'));
         });
     });
+
+    // Bind map source clicks
+    const btnSourceSlam = document.getElementById('btn-source-slam');
+    const btnSourceStatic = document.getElementById('btn-source-static');
+    if (btnSourceSlam) {
+        btnSourceSlam.addEventListener('click', () => {
+            if (wsConnected && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'set_map_source',
+                    source: 'slam'
+                }));
+            }
+        });
+    }
+    if (btnSourceStatic) {
+        btnSourceStatic.addEventListener('click', () => {
+            if (wsConnected && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'set_map_source',
+                    source: 'static'
+                }));
+            }
+        });
+    }
 
     // --- WEBSOCKET CONNECTION ---
     function connect() {
@@ -314,12 +337,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         valNavTarget.textContent = 'None';
                         if (mapCanvas) mapCanvas.draw();
                     }
+                } else if (msg.type === 'map_source_status') {
+                    updateMapSourceUI(msg.source);
                 }
             } catch (e) {
                 console.error('Error parsing WS message:', e);
             }
         };
-    }
+     }
 
     function updateNavStatus(status) {
         valNavStatus.textContent = status;
@@ -331,6 +356,24 @@ document.addEventListener('DOMContentLoaded', () => {
             valNavStatus.className = 'tel-value text-cyan';
         } else {
             valNavStatus.className = 'tel-value';
+        }
+    }
+
+    function updateMapSourceUI(source) {
+        const btnSlam = document.getElementById('btn-source-slam');
+        const btnStatic = document.getElementById('btn-source-static');
+        const mapSelectorGroup = document.getElementById('group-map-selector');
+        
+        if (!btnSlam || !btnStatic) return;
+        
+        if (source === 'slam') {
+            btnSlam.classList.add('active');
+            btnStatic.classList.remove('active');
+            if (mapSelectorGroup) mapSelectorGroup.classList.add('hidden');
+        } else {
+            btnSlam.classList.remove('active');
+            btnStatic.classList.add('active');
+            if (mapSelectorGroup) mapSelectorGroup.classList.remove('hidden');
         }
     }
 
@@ -699,10 +742,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         opt.textContent = map;
                         mapSelect.appendChild(opt);
                     });
-                    // Automatically load the first map after populating
-                    setTimeout(() => {
-                        loadStaticMap(data.maps[0]);
-                    }, 500);
                 } else {
                     const opt = document.createElement('option');
                     opt.value = '';

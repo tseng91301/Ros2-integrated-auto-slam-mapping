@@ -10,16 +10,16 @@ class MapCanvas {
             const hue2rgb = (p, q, t) => {
                 if (t < 0) t += 1;
                 if (t > 1) t -= 1;
-                if (t < 1/6) return p + (q - p) * 6 * t;
-                if (t < 1/2) return q;
-                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                if (t < 1 / 6) return p + (q - p) * 6 * t;
+                if (t < 1 / 2) return q;
+                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
                 return p;
             };
             const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
             const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1/3);
+            r = hue2rgb(p, q, h + 1 / 3);
             g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1/3);
+            b = hue2rgb(p, q, h - 1 / 3);
         }
         return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255];
     }
@@ -31,7 +31,7 @@ class MapCanvas {
             return;
         }
         this.ctx = this.canvas.getContext('2d');
-        
+
         // Configuration Options
         this.options = Object.assign({
             robotColor: 'rgba(239, 68, 68, 0.85)',
@@ -95,20 +95,20 @@ class MapCanvas {
     updateMap(mapMsg) {
         const width = mapMsg.width;
         const height = mapMsg.height;
-        
+
         this.mapWidth = width;
         this.mapHeight = height;
         this.resolution = mapMsg.resolution;
         this.originX = mapMsg.origin_x;
         this.originY = mapMsg.origin_y;
-        
+
         if (this.mapTelemetry) {
             this.mapTelemetry.innerText = `Map: ${width}x${height} @ ${this.resolution.toFixed(3)}m/px`;
         }
         if (this.mapPlaceholder) {
             this.mapPlaceholder.classList.add('hidden');
         }
-        
+
         // Decode base64 map data
         const binaryString = atob(mapMsg.data);
         const len = binaryString.length;
@@ -116,23 +116,23 @@ class MapCanvas {
         for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
-        
+
         // Setup offscreen canvas
         this.offscreenCanvas.width = width;
         this.offscreenCanvas.height = height;
-        
+
         const imgData = this.offscreenCtx.createImageData(width, height);
-        
+
         // Populate offscreen canvas pixels (vertically flipped for ROS)
         for (let canvas_y = 0; canvas_y < height; canvas_y++) {
             const grid_y = (height - 1) - canvas_y;
             for (let canvas_x = 0; canvas_x < width; canvas_x++) {
                 const grid_idx = grid_y * width + canvas_x;
                 const canvas_idx = (canvas_y * width + canvas_x) * 4;
-                
+
                 const val = bytes[grid_idx];
                 let color;
-                
+
                 if (val === 127) {
                     color = this.options.unknownColor;
                 } else if (val === 255) {
@@ -145,7 +145,7 @@ class MapCanvas {
                     // HSL: from 240 (blue) for low heat to 0 (red) for high heat
                     const hue = (1.0 - t_factor) * 240;
                     const rgb = MapCanvas.hslToRgb(hue / 360, 1.0, 0.5);
-                    
+
                     // Blend rgb with freeColor based on t_factor
                     const bg = this.options.freeColor;
                     color = [
@@ -155,15 +155,15 @@ class MapCanvas {
                         255
                     ];
                 }
-                
-                imgData.data[canvas_idx]     = color[0];
+
+                imgData.data[canvas_idx] = color[0];
                 imgData.data[canvas_idx + 1] = color[1];
                 imgData.data[canvas_idx + 2] = color[2];
                 imgData.data[canvas_idx + 3] = color[3];
             }
         }
         this.offscreenCtx.putImageData(imgData, 0, 0);
-        
+
         if (!this.hasMapData) {
             this.hasMapData = true;
             this.resetView();
@@ -216,7 +216,7 @@ class MapCanvas {
      */
     resetView() {
         if (!this.hasMapData) return;
-        
+
         const rect = this.canvas.getBoundingClientRect();
         this.canvas.width = Math.floor(rect.width);
         this.canvas.height = Math.floor(rect.height);
@@ -224,10 +224,10 @@ class MapCanvas {
         const scaleX = this.canvas.width / this.mapWidth;
         const scaleY = this.canvas.height / this.mapHeight;
         this.zoom = Math.min(scaleX, scaleY) * 0.95;
-        
+
         this.offsetX = (this.canvas.width - this.mapWidth * this.zoom) / 2;
         this.offsetY = (this.canvas.height - this.mapHeight * this.zoom) / 2;
-        
+
         this.draw();
     }
 
@@ -306,11 +306,11 @@ class MapCanvas {
             this.centroids.forEach(c => {
                 const cx = (c.x - this.originX) / this.resolution;
                 const cy = this.mapHeight - 1 - (c.y - this.originY) / this.resolution;
-                
+
                 const outerRadius = 5 / this.zoom;
                 const innerRadius = 1.5 / this.zoom;
                 const strokeWidth = 1 / this.zoom;
-                
+
                 this.ctx.beginPath();
                 this.ctx.arc(cx, cy, outerRadius, 0, 2 * Math.PI);
                 this.ctx.fillStyle = '#22c55e'; // Green
@@ -318,7 +318,7 @@ class MapCanvas {
                 this.ctx.lineWidth = strokeWidth;
                 this.ctx.fill();
                 this.ctx.stroke();
-                
+
                 this.ctx.beginPath();
                 this.ctx.arc(cx, cy, innerRadius, 0, 2 * Math.PI);
                 this.ctx.fillStyle = '#ffffff';
@@ -329,7 +329,7 @@ class MapCanvas {
         if (this.options.showTarget && this.target) {
             const tx = (this.target.x - this.originX) / this.resolution;
             const ty = this.mapHeight - 1 - (this.target.y - this.originY) / this.resolution;
-            
+
             // Pulse outer ring
             const pulse = (12 + Math.sin(Date.now() / 150) * 4) / this.zoom;
             this.ctx.beginPath();
@@ -337,14 +337,14 @@ class MapCanvas {
             this.ctx.strokeStyle = this.isRecovering ? 'rgba(244, 63, 94, 0.5)' : 'rgba(6, 182, 212, 0.5)';
             this.ctx.lineWidth = 2 / this.zoom;
             this.ctx.stroke();
-            
+
             // Center ring
             this.ctx.beginPath();
             this.ctx.arc(tx, ty, 8 / this.zoom, 0, 2 * Math.PI);
             this.ctx.strokeStyle = this.isRecovering ? '#f43f5e' : '#06b6d4';
             this.ctx.lineWidth = 2 / this.zoom;
             this.ctx.stroke();
-            
+
             // Crosshairs
             this.ctx.beginPath();
             this.ctx.moveTo(tx - 14 / this.zoom, ty);
@@ -380,7 +380,7 @@ class MapCanvas {
             const speed = p2[2];
             const maxSpeed = 0.5; // Normal speed limit
             const ratio = Math.min(speed / maxSpeed, 1.0);
-            
+
             // Map ratio to hue: 240 (blue) -> 120 (green) -> 0 (red)
             const hue = (1.0 - ratio) * 240;
             this.ctx.strokeStyle = `hsl(${hue}, 100%, 60%)`;
@@ -447,11 +447,11 @@ class MapCanvas {
      */
     drawScaleBar() {
         if (this.resolution <= 0) return;
-        
+
         const targetWidthPx = 80;
         const realDistance = (targetWidthPx * this.resolution) / this.zoom;
         const niceDistances = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01];
-        
+
         let selectedDist = niceDistances[niceDistances.length - 1];
         for (let i = 0; i < niceDistances.length; i++) {
             if (niceDistances[i] <= realDistance) {
@@ -459,7 +459,7 @@ class MapCanvas {
                 break;
             }
         }
-        
+
         const scaleWidthPx = (selectedDist * this.zoom) / this.resolution;
         const x = 20;
         const y = this.canvas.height - 20;
