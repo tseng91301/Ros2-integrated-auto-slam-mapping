@@ -136,7 +136,7 @@ apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-nav2-common \
   ros-jazzy-nav2-simple-commander ros-jazzy-slam-toolbox ros-jazzy-xacro \
   ros-jazzy-tf-transformations ros-jazzy-rviz2 ros-jazzy-ros-gz \
-  ros-jazzy-ros-gz-sim-demos ros-jazzy-gz-ros2-control
+  ros-jazzy-ros-gz-sim-demos ros-jazzy-gz-ros2-control ros-jazzy-nmea-msgs
 '
 
 # 安裝 ZED 在 ROS2 上面的相關依賴庫

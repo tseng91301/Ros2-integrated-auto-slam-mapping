@@ -19,10 +19,11 @@ def generate_launch_description():
 
     # Set parameter defaults from YAML
     radius_val = str(robot_params.get('robot', {}).get('radius', 0.22))
-    safety_dist_val = str(robot_params.get('exploration', {}).get('obstacle_safety_dist', 
-                          robot_params.get('navigation', {}).get('obstacle_safety_dist', 0.6)))
-    critical_dist_val = str(robot_params.get('exploration', {}).get('obstacle_critical_dist', 
-                            robot_params.get('navigation', {}).get('obstacle_critical_dist', 0.35)))
+    safety_dist_val = str(robot_params.get('exploration', {}).get('obstacle_safety_dist', 0.6))
+    critical_dist_val = str(robot_params.get('exploration', {}).get('obstacle_critical_dist', 0.3))
+    print("radius_val: ", radius_val)
+    print("safety_dist_val: ", safety_dist_val)
+    print("critical_dist_val: ", critical_dist_val)
     is_sim_val = str(robot_params.get('simulation', {}).get('is_sim', False)).lower()
 
     # Declare launch arguments

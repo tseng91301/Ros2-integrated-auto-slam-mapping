@@ -25,6 +25,51 @@ def generate_launch_description():
     my_param_dir = os.path.join(my_nav_dir, 'param', 'wheeltec_param')
     my_param_file = 'param_playerrobot.yaml'
 
+    # Load robot parameters from YAML
+    import yaml
+    robot_params = {}
+    for path in ['/workspaces/isaac_ros-dev/robot_params.yaml', './robot_params.yaml', os.path.expanduser('~/workspaces/isaac_ros-dev/robot_params.yaml')]:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    robot_params = yaml.safe_load(f)
+                break
+            except Exception as e:
+                print(f"Error loading {path}: {e}")
+
+    template_params_path = os.path.join(my_param_dir, my_param_file)
+    generated_params_path = '/tmp/wheeltec_params_generated.yaml'
+
+    if robot_params:
+        try:
+            with open(template_params_path, 'r') as f:
+                params_data = yaml.safe_load(f)
+
+            radius = robot_params.get('robot', {}).get('radius', 0.22)
+            inflation = robot_params.get('navigation', {}).get('inflation_radius', 0.70)
+
+            def update_nested(d):
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        update_nested(v)
+                    elif k == 'robot_radius':
+                        d[k] = radius
+                    elif k == 'inflation_radius':
+                        d[k] = inflation
+
+            update_nested(params_data)
+
+            with open(generated_params_path, 'w') as f:
+                yaml.safe_dump(params_data, f)
+
+            default_params_file = generated_params_path
+            print(f"Successfully generated dynamic params file at {generated_params_path} with radius={radius}, inflation={inflation}")
+        except Exception as e:
+            print(f"Failed to generate modified params file, falling back to default: {e}")
+            default_params_file = template_params_path
+    else:
+        default_params_file = template_params_path
+
 
     # Launch configurations
     namespace = LaunchConfiguration('namespace')
@@ -79,7 +124,7 @@ def generate_launch_description():
         description='Use simulation (Gazebo) clock if true')
 
     declare_params_file_cmd = DeclareLaunchArgument(
-        'params_file', default_value=os.path.join(my_param_dir, my_param_file),
+        'params_file', default_value=default_params_file,
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
     declare_autostart_cmd = DeclareLaunchArgument(

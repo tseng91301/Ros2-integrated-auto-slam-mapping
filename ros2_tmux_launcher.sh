@@ -35,7 +35,7 @@ import yaml, os
 try:
     with open('${SCRIPT_DIR}/robot_params.yaml') as f:
         config = yaml.safe_load(f)
-    with open('${SCRIPT_DIR}/src/auto_explorer/config/nav2_params_with_slam.yaml') as f:
+    with open('${SCRIPT_DIR}/src/wheeltec_robot_nav2/param/wheeltec_param/nav2_params_with_slam.yaml') as f:
         params = yaml.safe_load(f)
     
     radius = config.get('robot', {}).get('radius', 0.22)
@@ -52,7 +52,7 @@ try:
                 
     update_nested(params)
     
-    with open('${SCRIPT_DIR}/src/auto_explorer/config/nav2_params_with_slam_generated.yaml', 'w') as f:
+    with open('/tmp/nav2_params_with_slam_generated.yaml', 'w') as f:
         yaml.safe_dump(params, f)
 except Exception as e:
     print('Failed to generate modified nav2 params:', e)
@@ -358,7 +358,7 @@ if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_expl
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=True params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=True params_file:=/tmp/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
@@ -387,7 +387,7 @@ if [ "$1" == "sim_keyboard" ]; then
     tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
     
     # 1. 啟動 Gazebo 模擬器與 SLAM 項目
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/workspaces/isaac_ros-dev/src/auto_explorer/config/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=True headless:=False rviz_config:=/workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz params_file:=/tmp/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
     
     # 左右分割：右側 (新分割出的活動 pane 1)
     tmux split-window -h -t "$SESSION_NAME"
