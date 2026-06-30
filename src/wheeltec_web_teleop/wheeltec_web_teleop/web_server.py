@@ -225,10 +225,93 @@ class TeleopNode(Node):
         self.nav_waypoint_idx = 0
         self.nav_goal_handle = None
         
+        # Subprocess control for exploration and navigation launches
+        self.active_launch_proc = None
+        self.current_launch_type = None
+        self._auto_start_timer = self.create_timer(1.0, self.auto_start_exploration)
+        
         # Create a timer for fallback navigation control loop (10Hz)
         self.create_timer(0.1, self.navigation_control_step)
         
         self.get_logger().info("Web Teleop & Explorer ROS 2 Node initialized with Navigation support.")
+
+    def auto_start_exploration(self):
+        if hasattr(self, '_auto_start_timer'):
+            self._auto_start_timer.cancel()
+        self.start_sub_launch("exploration")
+
+    def start_sub_launch(self, launch_type, map_name=None):
+        # If there is an active launch process, terminate it cleanly
+        if self.active_launch_proc is not None:
+            self.get_logger().info(f"Terminating active launch process: {self.current_launch_type}")
+            self.active_launch_proc.terminate()
+            try:
+                self.active_launch_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.active_launch_proc.kill()
+            self.active_launch_proc = None
+            
+            # Additional cleanup of nodes to prevent leftovers
+            if self.current_launch_type == "exploration":
+                cmd = ["pkill", "-9", "-f", "async_slam_toolbox_node|auto_explorer|explorer_node"]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif self.current_launch_type == "navigation":
+                cmd = ["pkill", "-9", "-f", "map_server|amcl|planner_server|controller_server|bt_navigator|behavior_server|waypoint_follower|smoother_server|velocity_smoother|collision_monitor|lifecycle_manager"]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            time.sleep(1.0)
+            
+        # Determine use_sim_time
+        try:
+            use_sim_time = self.get_parameter('use_sim_time').value
+        except Exception:
+            self.declare_parameter('use_sim_time', False)
+            use_sim_time = self.get_parameter('use_sim_time').value
+
+        cmd = [
+            "ros2", "launch", "wheeltec_web_teleop", f"{launch_type}.launch.py",
+            f"use_sim_time:={str(use_sim_time).lower()}"
+        ]
+        
+        if launch_type == "navigation":
+            # Determine yaml path
+            yaml_path = None
+            if map_name:
+                yaml_path = get_map_yaml_path(map_name)
+            if not yaml_path:
+                # Try fallback defaults
+                for fallback_name in ["map_1750318412", "WHEELTEC", "map"]:
+                    path = get_map_yaml_path(fallback_name)
+                    if path and os.path.exists(path):
+                        yaml_path = path
+                        break
+            if not yaml_path:
+                # Find first yaml in maps directory
+                map_dir = get_map_dir()
+                if os.path.exists(map_dir):
+                    yamls = [f for f in os.listdir(map_dir) if f.endswith('.yaml')]
+                    if yamls:
+                        yaml_path = os.path.join(map_dir, yamls[0])
+            
+            if yaml_path:
+                self.get_logger().info(f"Using map file: {yaml_path}")
+                cmd.append(f"map:={yaml_path}")
+            else:
+                self.get_logger().error("No map file found for navigation launch!")
+                
+        self.get_logger().info(f"Launching subprocess: {' '.join(cmd)}")
+        self.active_launch_proc = subprocess.Popen(cmd)
+        self.current_launch_type = launch_type
+
+    def destroy_node(self):
+        if self.active_launch_proc is not None:
+            self.get_logger().info("Shutting down active launch process on node destruction...")
+            self.active_launch_proc.terminate()
+            try:
+                self.active_launch_proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.active_launch_proc.kill()
+        super().destroy_node()
 
     def call_reset_map(self):
         if not self.reset_cli.service_is_ready():
@@ -794,6 +877,9 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                 "type": "trajectory",
                 "data": latest_trajectory_data
             }))
+        # Send current map source status
+        source_val = "slam" if getattr(ros_node, 'current_launch_type', 'exploration') == "exploration" else "static"
+        self.write_message(json.dumps({"type": "map_source_status", "source": source_val}))
 
     def on_message(self, message):
         global latest_nav_map_data
@@ -844,13 +930,21 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif msg_type == "set_map_source":
                 self.map_source = data.get("source", "slam")
                 ros_node.get_logger().info(f"WebSocket client map source set to: {self.map_source}")
-                self.write_message(
+                if self.map_source == "slam":
+                    ros_node.start_sub_launch("exploration")
+                elif self.map_source == "static":
+                    ros_node.start_sub_launch("navigation")
+                safe_broadcast(
                     {"type": "map_source_status", "source": self.map_source}
                 )
             elif msg_type == "load_map":
                 map_name = data.get("map_name")
                 yaml_path = get_map_yaml_path(map_name)
                 ros_node.get_logger().info(f"Request to load static map: {yaml_path}")
+                ros_node.start_sub_launch("navigation", map_name=map_name)
+                safe_broadcast(
+                    {"type": "map_source_status", "source": "static"}
+                )
                 if yaml_path and os.path.exists(yaml_path):
                     try:
                         latest_nav_map_data = load_map_from_disk(yaml_path)
@@ -1054,6 +1148,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        if ros_node:
+            ros_node.destroy_node()
         rclpy.shutdown()
         spin_thread.join()
 

@@ -305,76 +305,38 @@ fi
 
 # ==================== 預設模式 3.5: web_all / explore ====================
 if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
-    echo "🚀 正在以 [web_all / explore] 模式啟動底盤、雷達、建圖、網頁監控、自動探索與 RViz2..."
+    echo "🚀 正在以 [web_all / explore] 模式啟動網頁控制器及對應的底盤/雷達 (ROS 啟動)..."
     
-    # 建立會話，第一個分頁命名為 SLAM
-    tmux new-session -d -s "$SESSION_NAME" -n "SLAM"
+    # 建立會話，第一個分頁命名為 Controller
+    tmux new-session -d -s "$SESSION_NAME" -n "Controller"
     
-    # 1. 啟動底盤 (左上角) - 寫入當前活動的 pane 0
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch base_control_ros2 00_base_control.launch.py'" C-m
-    
-    # 左右分割：右側 (新分割出的活動 pane 1)
-    tmux split-window -h -t "$SESSION_NAME"
-    # 右上角: SLAM 建圖
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py'" C-m
-    
-    # 選擇左側窗格 (索引 0)
-    tmux select-pane -t 0
-    # 上下分割左側：左下角 (新分割出的活動 pane 1，原右側變為 2)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 左下角: 雷達
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch sllidar_ros2 sllidar_a2m12_launch.py serial_port:=\"$LIDAR_PORT\"'" C-m
-    
-    # 選擇右側右上窗格 (此時索引已變為 2)
-    tmux select-pane -t 2
-    # 上下分割右側：右下角 (新分割出的活動 pane 3)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 右下角: 網頁遙控與伺服器
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_teleop.launch.py'" C-m
-    
-    # 選擇網頁遙控窗格 (此時索引為 3)
-    tmux select-pane -t 3
-    # 上下分割右下角：右下偏下 (新分割出的活動 pane 4)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 最右下角: 自動探索節點
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch auto_explorer auto_exploration.launch.py'" C-m
+    # 1. 啟動 Web Controller 整合 launch 檔 (會自動啟動底盤、雷達與網頁伺服器，並由網頁伺服器背景呼叫探索/建圖)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch wheeltec_web_teleop web_controller.launch.py'" C-m
     
     # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2
     tmux new-window -t "$SESSION_NAME" -n "RViz2"
     tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
     
-    # 回到第一個分頁並選取自動探索窗格 (此時索引為 4)
+    # 回到第一個分頁並選取第一個窗格
     tmux select-window -t "$SESSION_NAME:0"
-    tmux select-pane -t 4
+    tmux select-pane -t 0
     tmux attach-session -t "$SESSION_NAME"
     exit 0
 fi
 
 # ==================== 預設模式 3.6: sim_web_all / sim_explore ====================
 if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
-    echo "🚀 正在以 [sim_web_all / sim_explore] 模式啟動 Gazebo 模擬器、SLAM 建圖、網頁監控、自動探索與 RViz2..."
+    echo "🚀 正在以 [sim_web_all / sim_explore] 模式啟動網頁控制器及對應的模擬器 (ROS 啟動)..."
     
-    # 建立會話，第一個分頁命名為 Simulation
-    tmux new-session -d -s "$SESSION_NAME" -n "Simulation"
+    # 建立會話，第一個分頁命名為 Controller
+    tmux new-session -d -s "$SESSION_NAME" -n "Controller"
     
-    # 1. 啟動 Gazebo 模擬器與 SLAM 項目 (use_rviz:=False)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True use_rviz:=False headless:=True params_file:=/tmp/nav2_params_with_slam_generated.yaml world:=\"$SIM_WORLD_PATH\"'" C-m
+    # 1. 啟動 Web Controller 整合 launch 檔 (會自動啟動 Gazebo 模擬器與網頁伺服器，並由網頁伺服器背景呼叫探索/建圖)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_controller.launch.py' > a.txt" C-m
     
-    # 左右分割：右側 (新分割出的活動 pane 1)
-    tmux split-window -h -t "$SESSION_NAME"
-    # 右上角: 網頁遙控與伺服器 (啟用 use_sim_time:=true)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_teleop.launch.py use_sim_time:=true'" C-m
-    
-    # 選擇右側窗格 (索引 1)
-    tmux select-pane -t 1
-    # 上下分割右側：右下角 (新分割出的活動 pane 2)
-    tmux split-window -v -t "$SESSION_NAME"
-    # 右下角: 自動探索節點 (啟用 use_sim_time:=true)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch auto_explorer auto_exploration.launch.py use_sim_time:=true'" C-m
-    
-    # 回到第一個分頁並選取自動探索窗格 (索引 2)
+    # 回到第一個分頁並選取第一個窗格
     tmux select-window -t "$SESSION_NAME:0"
-    tmux select-pane -t 2
+    tmux select-pane -t 0
     tmux attach-session -t "$SESSION_NAME"
     exit 0
 fi
