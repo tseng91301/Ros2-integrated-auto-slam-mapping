@@ -131,9 +131,6 @@ def safe_broadcast(message_dict):
     def broadcast():
         for client in list(websocket_clients):
             try:
-                # Do not broadcast active SLAM map updates to clients in navigation mode
-                if message_dict.get("type") == "map" and getattr(client, "mode", "exploration") != "exploration":
-                    continue
                 client.write_message(msg_str)
             except Exception:
                 pass
@@ -844,17 +841,6 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif msg_type == "set_mode":
                 self.mode = data.get("mode", "exploration")
                 ros_node.get_logger().info(f"WebSocket client mode set to: {self.mode}")
-                if self.mode == "navigation":
-                    if latest_nav_map_data is not None:
-                        self.write_message(json.dumps(latest_nav_map_data))
-                    # Send current target and state
-                    if ros_node.nav_target is not None:
-                        self.write_message(json.dumps({
-                            "type": "nav_target",
-                            "x": ros_node.nav_target[0],
-                            "y": ros_node.nav_target[1],
-                            "status": ros_node.nav_state
-                        }))
             elif msg_type == "load_map":
                 map_name = data.get("map_name")
                 yaml_path = get_map_yaml_path(map_name)

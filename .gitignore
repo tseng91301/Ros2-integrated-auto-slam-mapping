@@ -8,3 +8,4 @@ src/auto_explorer/config/nav2_params_with_slam_generated.yaml
 robot_params.yaml
 ZED_Diagnostic_Results.json
 rosbags/
+t.sh

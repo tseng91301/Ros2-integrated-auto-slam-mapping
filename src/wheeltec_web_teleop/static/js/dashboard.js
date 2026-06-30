@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error parsing WS message:', e);
             }
         };
-     }
+    }
 
     function updateNavStatus(status) {
         valNavStatus.textContent = status;
@@ -363,9 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnSlam = document.getElementById('btn-source-slam');
         const btnStatic = document.getElementById('btn-source-static');
         const mapSelectorGroup = document.getElementById('group-map-selector');
-        
+
         if (!btnSlam || !btnStatic) return;
-        
+
         if (source === 'slam') {
             btnSlam.classList.add('active');
             btnStatic.classList.remove('active');
@@ -575,13 +575,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDpadButton('btn-linear-backward', () => { inputVx = -1.0; }, () => { inputVx = 0.0; });
     setupDpadButton('btn-linear-left', () => { if (isHolonomic) inputVy = 1.0; }, () => { inputVy = 0.0; });
     setupDpadButton('btn-linear-right', () => { if (isHolonomic) inputVy = -1.0; }, () => { inputVy = 0.0; });
-    
+
     const btnLinearStop = document.getElementById('btn-linear-stop');
     if (btnLinearStop) btnLinearStop.addEventListener('click', resetVelocityInputs);
 
     setupDpadButton('btn-turn-left', () => { inputWz = 1.0; }, () => { inputWz = 0.0; });
     setupDpadButton('btn-turn-right', () => { inputWz = -1.0; }, () => { inputWz = 0.0; });
-    
+
     const btnAngularStop = document.getElementById('btn-angular-stop');
     if (btnAngularStop) btnAngularStop.addEventListener('click', () => { inputWz = 0.0; });
 
