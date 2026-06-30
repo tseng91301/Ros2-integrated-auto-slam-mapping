@@ -27,8 +27,10 @@ from slam_toolbox.srv import Reset
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from std_srvs.srv import Trigger
+from nav2_msgs.srv import LoadMap
 import asyncio
 import time
+import signal
 
 # Global variables to store the node and active web socket clients
 ros_node = None
@@ -38,6 +40,9 @@ latest_markers_data = None  # Cache for exploration markers
 latest_status_data = None  # Cache for exploration status
 latest_nav_map_data = None  # Cache for static navigation map
 latest_trajectory_data = None  # Cache for robot trajectory
+map_source = "slam"  # Current map source: "slam" or "static"
+localization_process = None  # Subprocess for localization launch
+current_static_map = ""  # Currently selected pre-built map name
 main_loop = None  # Main thread's Tornado IOLoop
 
 def get_map_dir():
@@ -122,6 +127,120 @@ def load_map_from_disk(yaml_path):
         "data": b64_str
     }
 
+def get_lifecycle_state(node_name):
+    try:
+        proc = subprocess.run(
+            ["ros2", "lifecycle", "get", node_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=2
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip().split()[0]
+    except Exception:
+        pass
+    return "unknown"
+
+def set_map_source(source_type):
+    global map_source, localization_process
+    if source_type == "static":
+        if ros_node:
+            ros_node.get_logger().info("Deactivating slam_toolbox...")
+        # Deactivate slam_toolbox
+        subprocess.run(["ros2", "lifecycle", "set", "/slam_toolbox", "deactivate"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Kill any existing localization process first to be safe
+        if localization_process:
+            if ros_node:
+                ros_node.get_logger().info("Terminating existing localization process...")
+            try:
+                os.killpg(os.getpgid(localization_process.pid), signal.SIGINT)
+                localization_process.wait(timeout=2.0)
+            except Exception:
+                try:
+                    os.killpg(os.getpgid(localization_process.pid), signal.SIGKILL)
+                except Exception:
+                    pass
+            localization_process = None
+            
+        # Give it a moment to release ports/nodes
+        time.sleep(1.0)
+        
+        # Select parameters file
+        params_file = "/tmp/nav2_params_with_slam_generated.yaml"
+        if not os.path.exists(params_file):
+            params_file = "/tmp/wheeltec_params_generated.yaml"
+        if not os.path.exists(params_file):
+            params_file = "/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/param/wheeltec_param/param_playerrobot.yaml"
+            
+        # Get active map
+        global current_static_map
+        map_yaml_path = ""
+        if current_static_map:
+            # Look up map yaml path
+            for root_dir in ["/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map", 
+                             "/home/ubuntu/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
+                             "/home/ubuntu/maps"]:
+                yaml_candidate = os.path.join(root_dir, f"{current_static_map}.yaml")
+                if os.path.exists(yaml_candidate):
+                    map_yaml_path = yaml_candidate
+                    break
+                    
+        if not map_yaml_path:
+            # Fallback to WHEELTEC
+            map_yaml_path = "/workspaces/isaac_ros-dev/install/wheeltec_nav2/share/wheeltec_nav2/map/WHEELTEC.yaml"
+
+        if ros_node:
+            ros_node.get_logger().info(f"Launching localization_launch.py with map: {map_yaml_path} and params: {params_file}")
+            
+        use_sim_time_str = "true" if (ros_node and ros_node.get_parameter('use_sim_time').value) else "false"
+        
+        try:
+            localization_process = subprocess.Popen(
+                ["ros2", "launch", "wheeltec_nav2", "localization_launch.py",
+                 f"use_sim_time:={use_sim_time_str}",
+                 f"map:={map_yaml_path}",
+                 f"params_file:={params_file}"],
+                preexec_fn=os.setsid,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            # Give it a moment to initialize
+            time.sleep(2.0)
+        except Exception as e:
+            if ros_node:
+                ros_node.get_logger().error(f"Failed to launch localization: {str(e)}")
+        
+        map_source = "static"
+    else:
+        # Kill the localization launch process (which stops map_server and amcl)
+        if localization_process:
+            if ros_node:
+                ros_node.get_logger().info("Terminating localization process to restore SLAM...")
+            try:
+                os.killpg(os.getpgid(localization_process.pid), signal.SIGINT)
+                localization_process.wait(timeout=2.0)
+            except Exception:
+                try:
+                    os.killpg(os.getpgid(localization_process.pid), signal.SIGKILL)
+                except Exception:
+                    pass
+            localization_process = None
+            
+        # Give it a moment
+        time.sleep(1.0)
+        
+        if ros_node:
+            ros_node.get_logger().info("Activating slam_toolbox...")
+        state = get_lifecycle_state("/slam_toolbox")
+        if state == "unconfigured":
+            subprocess.run(["ros2", "lifecycle", "set", "/slam_toolbox", "configure"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["ros2", "lifecycle", "set", "/slam_toolbox", "activate"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif state == "inactive":
+            subprocess.run(["ros2", "lifecycle", "set", "/slam_toolbox", "activate"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        map_source = "slam"
 
 def safe_broadcast(message_dict):
     global main_loop, websocket_clients
@@ -131,9 +250,6 @@ def safe_broadcast(message_dict):
     def broadcast():
         for client in list(websocket_clients):
             try:
-                # Do not broadcast active SLAM map updates to clients in navigation mode
-                if message_dict.get("type") == "map" and getattr(client, "mode", "exploration") != "exploration":
-                    continue
                 client.write_message(msg_str)
             except Exception:
                 pass
@@ -217,6 +333,9 @@ class TeleopNode(Node):
         # Create client for slam_toolbox reset service
         self.reset_cli = self.create_client(Reset, '/slam_toolbox/reset')
         
+        # Create client for map_server load_map service
+        self.load_map_cli = self.create_client(LoadMap, '/map_server/load_map')
+        
         # Create a timer to broadcast robot pose at 10Hz
         self.create_timer(0.1, self.update_robot_pose)
         
@@ -250,6 +369,34 @@ class TeleopNode(Node):
             self.get_logger().info("SLAM Toolbox reset service call successful.")
         except Exception as e:
             self.get_logger().error(f"SLAM Toolbox reset service call failed: {e}")
+
+    def call_load_map(self, yaml_path):
+        # Format the yaml_path to standard file URL scheme (file:///...)
+        file_url = f"file://{yaml_path}"
+        
+        if not self.load_map_cli.service_is_ready():
+            self.get_logger().warn("Map Server load_map service not ready. Fallback to CLI subprocess.")
+            cmd = ["ros2", "service", "call", "/map_server/load_map", "nav2_msgs/srv/LoadMap", f"{{map_url: '{file_url}'}}"]
+            self.get_logger().info(f"Calling fallback command: {' '.join(cmd)}")
+            subprocess.Popen(cmd)
+            return
+
+        req = LoadMap.Request()
+        req.map_url = file_url
+        self.get_logger().info(f"Sending LoadMap request to /map_server/load_map: {file_url}")
+        future = self.load_map_cli.call_async(req)
+        
+        def load_map_done_callback(fut):
+            try:
+                res = fut.result()
+                if res.result == 0:
+                    self.get_logger().info("Map Server successfully loaded new map.")
+                else:
+                    self.get_logger().error(f"Map Server failed to load map, result code: {res.result}")
+            except Exception as e:
+                self.get_logger().error(f"Error checking LoadMap result: {e}")
+        
+        future.add_done_callback(load_map_done_callback)
 
     def scan_callback(self, msg):
         self.latest_scan = msg
@@ -579,7 +726,7 @@ class TeleopNode(Node):
         safe_broadcast({"type": "nav_status", "status": "ARRIVED"})
 
     def plan_fallback_path(self):
-        global latest_nav_map_data
+        global latest_map_data
         
         robot_pose = self.get_robot_pose()
         if robot_pose is None:
@@ -589,19 +736,19 @@ class TeleopNode(Node):
             
         robot_x, robot_y, robot_yaw = robot_pose
         
-        if latest_nav_map_data is None:
+        if latest_map_data is None:
             self.nav_path = [self.nav_target]
             self.nav_waypoint_idx = 0
             return
             
-        width = latest_nav_map_data["width"]
-        height = latest_nav_map_data["height"]
-        resolution = latest_nav_map_data["resolution"]
-        origin_x = latest_nav_map_data["origin_x"]
-        origin_y = latest_nav_map_data["origin_y"]
+        width = latest_map_data["width"]
+        height = latest_map_data["height"]
+        resolution = latest_map_data["resolution"]
+        origin_x = latest_map_data["origin_x"]
+        origin_y = latest_map_data["origin_y"]
         
         # Decode base64 to 2D numpy array
-        raw_data = base64.b64decode(latest_nav_map_data["data"])
+        raw_data = base64.b64decode(latest_map_data["data"])
         grid = np.frombuffer(raw_data, dtype=np.uint8).reshape((height, width))
         
         def world_to_grid(wx, wy):
@@ -781,6 +928,11 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         self.mode = "exploration"  # default mode
         websocket_clients.add(self)
         ros_node.get_logger().info("WebSocket client connected.")
+        # Immediately send current map source status
+        self.write_message(json.dumps({
+            "type": "map_source_status",
+            "source": map_source
+        }))
         # Immediately send cached map data if available
         if latest_map_data is not None:
             self.write_message(json.dumps(latest_map_data))
@@ -844,30 +996,45 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif msg_type == "set_mode":
                 self.mode = data.get("mode", "exploration")
                 ros_node.get_logger().info(f"WebSocket client mode set to: {self.mode}")
-                if self.mode == "navigation":
-                    if latest_nav_map_data is not None:
-                        self.write_message(json.dumps(latest_nav_map_data))
-                    # Send current target and state
-                    if ros_node.nav_target is not None:
-                        self.write_message(json.dumps({
-                            "type": "nav_target",
-                            "x": ros_node.nav_target[0],
-                            "y": ros_node.nav_target[1],
-                            "status": ros_node.nav_state
-                        }))
+                self.write_message(json.dumps({
+                    "type": "map_source_status",
+                    "source": map_source
+                }))
+                if latest_map_data is not None:
+                    self.write_message(json.dumps(latest_map_data))
+                # Send current target and state
+                if ros_node.nav_target is not None:
+                    self.write_message(json.dumps({
+                        "type": "nav_target",
+                        "x": ros_node.nav_target[0],
+                        "y": ros_node.nav_target[1],
+                        "status": ros_node.nav_state
+                    }))
+            elif msg_type == "set_map_source":
+                source = data.get("source", "slam")
+                set_map_source(source)
+                safe_broadcast({
+                    "type": "map_source_status",
+                    "source": map_source
+                })
             elif msg_type == "load_map":
                 map_name = data.get("map_name")
+                global current_static_map
+                current_static_map = map_name
                 yaml_path = get_map_yaml_path(map_name)
                 ros_node.get_logger().info(f"Request to load static map: {yaml_path}")
                 if yaml_path and os.path.exists(yaml_path):
                     try:
-                        latest_nav_map_data = load_map_from_disk(yaml_path)
-                        # Broadcast map to all navigation clients
-                        for client in list(websocket_clients):
-                            if getattr(client, "mode", "exploration") == "navigation":
-                                client.write_message(json.dumps(latest_nav_map_data))
+                        # Automatically switch to static map source and notify
+                        set_map_source("static")
+                        safe_broadcast({
+                            "type": "map_source_status",
+                            "source": map_source
+                        })
+                        # Notify the ROS 2 map_server node to switch the map using file:// scheme
+                        ros_node.call_load_map(yaml_path)
                     except Exception as e:
-                        ros_node.get_logger().error(f"Error loading map from disk: {e}")
+                        ros_node.get_logger().error(f"Error loading map: {e}")
             elif msg_type == "set_nav_target":
                 x = data.get("x")
                 y = data.get("y")
