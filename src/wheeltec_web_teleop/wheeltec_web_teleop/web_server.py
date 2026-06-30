@@ -841,6 +841,12 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif msg_type == "set_mode":
                 self.mode = data.get("mode", "exploration")
                 ros_node.get_logger().info(f"WebSocket client mode set to: {self.mode}")
+            elif msg_type == "set_map_source":
+                self.map_source = data.get("source", "slam")
+                ros_node.get_logger().info(f"WebSocket client map source set to: {self.map_source}")
+                self.write_message(
+                    {"type": "map_source_status", "source": self.map_source}
+                )
             elif msg_type == "load_map":
                 map_name = data.get("map_name")
                 yaml_path = get_map_yaml_path(map_name)
