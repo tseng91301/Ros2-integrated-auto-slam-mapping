@@ -360,20 +360,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateMapSourceUI(source) {
-        const btnSlam = document.getElementById('btn-source-slam');
-        const btnStatic = document.getElementById('btn-source-static');
         const mapSelectorGroup = document.getElementById('group-map-selector');
-
-        if (!btnSlam || !btnStatic) return;
-
-        if (source === 'slam') {
-            btnSlam.classList.add('active');
-            btnStatic.classList.remove('active');
-            if (mapSelectorGroup) mapSelectorGroup.classList.add('hidden');
-        } else {
-            btnSlam.classList.remove('active');
-            btnStatic.classList.add('active');
-            if (mapSelectorGroup) mapSelectorGroup.classList.remove('hidden');
+        if (mapSelectorGroup) {
+            mapSelectorGroup.classList.remove('hidden');
         }
     }
 

@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
+from nav2_msgs.srv import ClearEntireCostmap
 from nav_msgs.msg import OccupancyGrid
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -40,30 +41,68 @@ latest_nav_map_data = None  # Cache for static navigation map
 latest_trajectory_data = None  # Cache for robot trajectory
 main_loop = None  # Main thread's Tornado IOLoop
 
-def get_map_dir():
-    # Try source workspace paths inside container first (writeable and persistent)
-    paths = [
-        "/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
-        "/home/ubuntu/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map"
-    ]
-    for p in paths:
-        if os.path.exists(p) and os.access(p, os.W_OK):
-            return p
-            
-    # Try package share maps folder
-    try:
-        map_dir = os.path.join(get_package_share_directory('wheeltec_nav2'), 'map')
-        if os.path.exists(map_dir) and os.access(map_dir, os.W_OK):
-            return map_dir
-    except Exception:
-        pass
+def is_simulation_mode():
+    robot_params = {}
+    params_path = '/workspaces/isaac_ros-dev/robot_params.yaml'
+    if not os.path.exists(params_path):
+        params_path = '/home/ubuntu/workspaces/isaac_ros-dev/robot_params.yaml'
+    
+    if os.path.exists(params_path):
+        try:
+            with open(params_path, 'r') as f:
+                robot_params = yaml.safe_load(f)
+        except Exception:
+            pass
+    
+    is_sim_val = robot_params.get('simulation', {}).get('is_sim', False)
+    return str(is_sim_val).lower() == 'true'
+
+def get_active_maps_dir():
+    is_sim = is_simulation_mode()
+    
+    if is_sim:
+        robot_params = {}
+        params_path = '/workspaces/isaac_ros-dev/robot_params.yaml'
+        if not os.path.exists(params_path):
+            params_path = '/home/ubuntu/workspaces/isaac_ros-dev/robot_params.yaml'
         
-    # Default container path
-    fallback = "/home/ubuntu/maps"
-    os.makedirs(fallback, exist_ok=True)
-    return fallback
+        if os.path.exists(params_path):
+            try:
+                with open(params_path, 'r') as f:
+                    robot_params = yaml.safe_load(f)
+            except Exception:
+                pass
+                
+        world_path = robot_params.get('simulation', {}).get('world_path', '')
+        if world_path:
+            world_dir = os.path.dirname(world_path)
+            maps_dir = os.path.join(world_dir, 'maps')
+            os.makedirs(maps_dir, exist_ok=True)
+            return maps_dir
+        # Fallback if no world_path in simulation
+        fallback = "/workspaces/isaac_ros-dev/worlds/virtual/my-nav-map/maps"
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+    else:
+        # Physical mode maps directory
+        phys_dir = "/workspaces/isaac_ros-dev/worlds/physical"
+        os.makedirs(phys_dir, exist_ok=True)
+        return phys_dir
+
+def get_map_dir():
+    return get_active_maps_dir()
 
 def get_map_yaml_path(map_name):
+    if os.path.isabs(map_name):
+        return map_name if os.path.exists(map_name) else None
+        
+    # Search in active maps directory first
+    active_dir = get_active_maps_dir()
+    yaml_path = os.path.join(active_dir, f"{map_name}.yaml")
+    if os.path.exists(yaml_path):
+        return yaml_path
+        
+    # Fallback search dirs
     search_dirs = [
         "/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
         "/home/ubuntu/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
@@ -79,6 +118,21 @@ def get_map_yaml_path(map_name):
         if os.path.exists(yaml_path):
             return yaml_path
     return None
+
+def get_default_map_name():
+    maps_dir = get_active_maps_dir()
+    if os.path.exists(maps_dir):
+        # Search candidates in order
+        candidates = ["slam_map", "stored_map", "map"]
+        for c in candidates:
+            if os.path.exists(os.path.join(maps_dir, f"{c}.yaml")):
+                return c
+        # Look for any .yaml
+        yamls = [f[:-5] for f in os.listdir(maps_dir) if f.endswith('.yaml')]
+        if yamls:
+            return yamls[0]
+    return "map"
+
 
 def load_map_from_disk(yaml_path):
     with open(yaml_path, 'r') as f:
@@ -230,8 +284,19 @@ class TeleopNode(Node):
         self.current_launch_type = None
         self._auto_start_timer = self.create_timer(1.0, self.auto_start_exploration)
         
-        # Create a timer for fallback navigation control loop (10Hz)
-        self.create_timer(0.1, self.navigation_control_step)
+        # Publisher for AMCL initialization
+        self.init_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 10)
+        
+        # Clients for costmap clearing
+        self.clear_global_costmap_cli = self.create_client(ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
+        self.clear_local_costmap_cli = self.create_client(ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
+        
+        # Transition variables
+        self.last_known_pose = None
+        self.last_transition_pose = None
+        self.nav_init_timer = None
+        self.nav_init_ticks = 0
+        self.costmaps_cleared = False
         
         self.get_logger().info("Web Teleop & Explorer ROS 2 Node initialized with Navigation support.")
 
@@ -278,6 +343,10 @@ class TeleopNode(Node):
             yaml_path = None
             if map_name:
                 yaml_path = get_map_yaml_path(map_name)
+            if not yaml_path:
+                # Try default map name from active world/mode maps directory
+                default_name = get_default_map_name()
+                yaml_path = get_map_yaml_path(default_name)
             if not yaml_path:
                 # Try fallback defaults
                 for fallback_name in ["map_1750318412", "WHEELTEC", "map"]:
@@ -490,11 +559,8 @@ class TeleopNode(Node):
             self.get_logger().error(f"Error in trajectory_callback: {str(e)}")
 
     def update_robot_pose(self):
-        global websocket_clients
-        if not websocket_clients:
-            return
+        # Always try to lookup and cache the last known pose
         try:
-            # Lookup latest transform map -> base_footprint (or fallback to base_link)
             try:
                 trans = self.tf_buffer.lookup_transform('map', 'base_footprint', rclpy.time.Time())
             except Exception:
@@ -502,26 +568,117 @@ class TeleopNode(Node):
                 
             x = trans.transform.translation.x
             y = trans.transform.translation.y
+            z = trans.transform.translation.z
             q = trans.transform.rotation
+            self.last_known_pose = (x, y, z, q.x, q.y, q.z, q.w)
             
-            # Convert quaternion to yaw angle
-            siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-            cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-            yaw = np.arctan2(siny_cosp, cosy_cosp)
-            
-            pose_data = {
-                "type": "robot_pose",
-                "x": x,
-                "y": y,
-                "yaw": yaw
-            }
-            
-            # Broadcast pose
-            safe_broadcast(pose_data)
+            global websocket_clients
+            if websocket_clients:
+                # Convert quaternion to yaw angle
+                siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+                cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+                yaw = np.arctan2(siny_cosp, cosy_cosp)
+                
+                pose_data = {
+                    "type": "robot_pose",
+                    "x": x,
+                    "y": y,
+                    "yaw": yaw
+                }
+                safe_broadcast(pose_data)
         except Exception as e:
-            # Log TF lookup error for diagnostic purposes
-            self.get_logger().error(f"TF lookup failed: {str(e)}")
             pass
+
+    def get_full_robot_pose(self):
+        try:
+            try:
+                trans = self.tf_buffer.lookup_transform('map', 'base_footprint', rclpy.time.Time())
+            except Exception:
+                trans = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+            x = trans.transform.translation.x
+            y = trans.transform.translation.y
+            z = trans.transform.translation.z
+            q = trans.transform.rotation
+            return (x, y, z, q.x, q.y, q.z, q.w)
+        except Exception:
+            return None
+
+    def capture_last_pose(self):
+        self.get_logger().info("capture_last_pose called")
+        pose = self.get_full_robot_pose()
+        if pose is not None:
+            self.last_transition_pose = pose
+            self.get_logger().info(f"Captured current pose from TF: {pose}")
+        elif getattr(self, 'last_known_pose', None) is not None:
+            self.last_transition_pose = self.last_known_pose
+            self.get_logger().info(f"TF lookup failed, using cached last known pose: {self.last_transition_pose}")
+        else:
+            self.last_transition_pose = None
+            self.get_logger().warn("No valid pose captured for transition to navigation.")
+
+    def trigger_nav_initialization(self):
+        if self.nav_init_timer is not None:
+            self.nav_init_timer.cancel()
+            self.nav_init_timer = None
+        self.nav_init_ticks = 0
+        self.costmaps_cleared = False
+        self.nav_init_timer = self.create_timer(1.0, self.nav_initialization_tick)
+        self.get_logger().info("Triggered navigation initialization loop.")
+
+    def nav_initialization_tick(self):
+        self.nav_init_ticks += 1
+        
+        # 1. Publish initial pose to AMCL
+        pose = getattr(self, 'last_transition_pose', None)
+        if pose is None:
+            pose = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+            
+        x, y, z, qx, qy, qz, qw = pose
+        msg = PoseWithCovarianceStamped()
+        msg.header.frame_id = 'map'
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.position.x = float(x)
+        msg.pose.pose.position.y = float(y)
+        msg.pose.pose.position.z = float(z)
+        msg.pose.pose.orientation.x = float(qx)
+        msg.pose.pose.orientation.y = float(qy)
+        msg.pose.pose.orientation.z = float(qz)
+        msg.pose.pose.orientation.w = float(qw)
+        
+        cov = [0.0] * 36
+        cov[0] = 0.25
+        cov[7] = 0.25
+        cov[35] = 0.06
+        msg.pose.covariance = cov
+        
+        self.init_pose_pub.publish(msg)
+        self.get_logger().info(f"Published transition initialpose: x={x:.2f}, y={y:.2f} (tick {self.nav_init_ticks})")
+        
+        # 2. Asynchronously call costmap clearing services
+        if not self.costmaps_cleared:
+            global_ready = self.clear_global_costmap_cli.service_is_ready()
+            local_ready = self.clear_local_costmap_cli.service_is_ready()
+            if global_ready and local_ready:
+                req_global = ClearEntireCostmap.Request()
+                req_local = ClearEntireCostmap.Request()
+                self.clear_global_costmap_cli.call_async(req_global)
+                self.clear_local_costmap_cli.call_async(req_local)
+                self.costmaps_cleared = True
+                self.get_logger().info("Natively called costmap clearing services successfully.")
+            else:
+                self.get_logger().warn(f"Costmap services not ready (global={global_ready}, local={local_ready}). Will retry.")
+                
+        # 3. Stop check
+        if (self.costmaps_cleared and self.nav_init_ticks >= 5) or self.nav_init_ticks >= 10:
+            if not self.costmaps_cleared:
+                self.get_logger().warn("Natively clearing costmaps timed out. Invoking CLI fallback.")
+                cmd1 = ["ros2", "service", "call", "/global_costmap/clear_entirely_global_costmap", "nav2_msgs/srv/ClearEntireCostmap", "{}"]
+                cmd2 = ["ros2", "service", "call", "/local_costmap/clear_entirely_local_costmap", "nav2_msgs/srv/ClearEntireCostmap", "{}"]
+                subprocess.Popen(cmd1)
+                subprocess.Popen(cmd2)
+            self.nav_init_timer.cancel()
+            self.nav_init_timer = None
+            self.get_logger().info("Navigation initialization loop finished.")
 
     def publish_twist(self, x, y, th):
         safe_x = float(x)
@@ -834,22 +991,12 @@ class NavigationHandler(tornado.web.RequestHandler):
 class ListMapsHandler(tornado.web.RequestHandler):
     """API endpoint to list maps on the server."""
     def get(self):
-        search_dirs = [
-            "/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
-            "/home/ubuntu/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
-            "/home/ubuntu/maps"
-        ]
-        try:
-            search_dirs.append(os.path.join(get_package_share_directory('wheeltec_nav2'), 'map'))
-        except Exception:
-            pass
-
+        d = get_active_maps_dir()
         maps = set()
-        for d in search_dirs:
-            if os.path.exists(d):
-                for file in os.listdir(d):
-                    if file.endswith(".yaml"):
-                        maps.add(file[:-5])  # Remove .yaml
+        if os.path.exists(d):
+            for file in os.listdir(d):
+                if file.endswith(".yaml"):
+                    maps.add(file[:-5])  # Remove .yaml
         self.write(json.dumps({"maps": sorted(list(maps))}))
 
 
@@ -927,13 +1074,49 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif msg_type == "set_mode":
                 self.mode = data.get("mode", "exploration")
                 ros_node.get_logger().info(f"WebSocket client mode set to: {self.mode}")
+                if self.mode == "navigation":
+                    if ros_node.current_launch_type != "navigation":
+                        # Auto-save map as slam_map
+                        save_dir = get_map_dir()
+                        filepath = os.path.join(save_dir, "slam_map")
+                        ros_node.get_logger().info(f"Auto-saving SLAM map to {filepath} before transition...")
+                        cmd = ["ros2", "run", "nav2_map_server", "map_saver_cli", "-f", filepath]
+                        try:
+                            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=4.0)
+                            ros_node.get_logger().info("SLAM map saved successfully.")
+                        except Exception as e:
+                            ros_node.get_logger().error(f"Failed to auto-save SLAM map: {e}")
+
+                        ros_node.capture_last_pose()
+                        ros_node.start_sub_launch("navigation")
+                        ros_node.trigger_nav_initialization()
+                    safe_broadcast({"type": "map_source_status", "source": "static"})
+                elif self.mode == "exploration":
+                    if ros_node.current_launch_type != "exploration":
+                        ros_node.start_sub_launch("exploration")
+                    safe_broadcast({"type": "map_source_status", "source": "slam"})
             elif msg_type == "set_map_source":
                 self.map_source = data.get("source", "slam")
                 ros_node.get_logger().info(f"WebSocket client map source set to: {self.map_source}")
                 if self.map_source == "slam":
-                    ros_node.start_sub_launch("exploration")
+                    if ros_node.current_launch_type != "exploration":
+                        ros_node.start_sub_launch("exploration")
                 elif self.map_source == "static":
-                    ros_node.start_sub_launch("navigation")
+                    if ros_node.current_launch_type != "navigation":
+                        # Auto-save map as slam_map
+                        save_dir = get_map_dir()
+                        filepath = os.path.join(save_dir, "slam_map")
+                        ros_node.get_logger().info(f"Auto-saving SLAM map to {filepath} before transition...")
+                        cmd = ["ros2", "run", "nav2_map_server", "map_saver_cli", "-f", filepath]
+                        try:
+                            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=4.0)
+                            ros_node.get_logger().info("SLAM map saved successfully.")
+                        except Exception as e:
+                            ros_node.get_logger().error(f"Failed to auto-save SLAM map: {e}")
+
+                        ros_node.capture_last_pose()
+                        ros_node.start_sub_launch("navigation")
+                        ros_node.trigger_nav_initialization()
                 safe_broadcast(
                     {"type": "map_source_status", "source": self.map_source}
                 )
@@ -941,7 +1124,9 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                 map_name = data.get("map_name")
                 yaml_path = get_map_yaml_path(map_name)
                 ros_node.get_logger().info(f"Request to load static map: {yaml_path}")
+                ros_node.capture_last_pose()
                 ros_node.start_sub_launch("navigation", map_name=map_name)
+                ros_node.trigger_nav_initialization()
                 safe_broadcast(
                     {"type": "map_source_status", "source": "static"}
                 )

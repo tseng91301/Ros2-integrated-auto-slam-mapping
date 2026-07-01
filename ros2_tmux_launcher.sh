@@ -229,17 +229,11 @@ if [ "$IS_SIM" == "true" ] || [ "$IS_SIM" == "True" ]; then
     elif [ "$1" == "slam_all" ]; then
         echo "⚠️ 偵測到 robot_params.yaml 已啟用模擬模式，自動切換至 sim_keyboard 模式..."
         set -- "sim_keyboard" "${@:2}"
-    elif [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
-        echo "⚠️ 偵測到 robot_params.yaml 已啟用模擬模式，自動切換至 sim_web_all 模式..."
-        set -- "sim_web_all" "${@:2}"
     fi
 else
     if [ "$1" == "sim_keyboard" ]; then
         echo "⚠️ 偵測到 robot_params.yaml 未啟用模擬模式，自動切換至 teleop 模式..."
         set -- "teleop" "${@:2}"
-    elif [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
-        echo "⚠️ 偵測到 robot_params.yaml 未啟用模擬模式，自動切換至 web_all 模式..."
-        set -- "web_all" "${@:2}"
     fi
 fi
 
@@ -303,36 +297,19 @@ if [ "$1" == "slam_all" ]; then
     exit 0
 fi
 
-# ==================== 預設模式 3.5: web_all / explore ====================
-if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ]; then
-    echo "🚀 正在以 [web_all / explore] 模式啟動網頁控制器及對應的底盤/雷達 (ROS 啟動)..."
+# ==================== 預設模式: web_all (網頁遙控與環境探索) ====================
+if [ "$1" == "web_all" ] || [ "$1" == "explore" ] || [ "$1" == "explorer" ] || [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
+    echo "🚀 正在以 [web_all] 模式啟動網頁控制器及必要組件 (ROS 啟動)..."
     
     # 建立會話，第一個分頁命名為 Controller
     tmux new-session -d -s "$SESSION_NAME" -n "Controller"
     
-    # 1. 啟動 Web Controller 整合 launch 檔 (會自動啟動底盤、雷達與網頁伺服器，並由網頁伺服器背景呼叫探索/建圖)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch wheeltec_web_teleop web_controller.launch.py'" C-m
+    # 1. 啟動 Web Controller 整合 launch 檔 (會自動根據 robot_params.yaml 決定啟動實體底盤/雷達或 Gazebo 模擬器)
+    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export BASE_TYPE=NanoRobot && ros2 launch wheeltec_web_teleop web_controller.launch.py' > debug_logs/latest.txt" C-m
     
     # 2. 新開一個 tmux 視窗分頁 (Window 1) 來單獨執行 RViz2
     tmux new-window -t "$SESSION_NAME" -n "RViz2"
     tmux send-keys -t "$SESSION_NAME:1" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && export DISPLAY=${CONTAINER_DISPLAY} && rviz2 -d /workspaces/isaac_ros-dev/wheeltec_slam_toolbox.rviz'" C-m
-    
-    # 回到第一個分頁並選取第一個窗格
-    tmux select-window -t "$SESSION_NAME:0"
-    tmux select-pane -t 0
-    tmux attach-session -t "$SESSION_NAME"
-    exit 0
-fi
-
-# ==================== 預設模式 3.6: sim_web_all / sim_explore ====================
-if [ "$1" == "sim_web_all" ] || [ "$1" == "sim_explore" ] || [ "$1" == "sim_explorer" ]; then
-    echo "🚀 正在以 [sim_web_all / sim_explore] 模式啟動網頁控制器及對應的模擬器 (ROS 啟動)..."
-    
-    # 建立會話，第一個分頁命名為 Controller
-    tmux new-session -d -s "$SESSION_NAME" -n "Controller"
-    
-    # 1. 啟動 Web Controller 整合 launch 檔 (會自動啟動 Gazebo 模擬器與網頁伺服器，並由網頁伺服器背景呼叫探索/建圖)
-    tmux send-keys -t "$SESSION_NAME" "$DOCKER_EXEC bash -lc '$ROS2_SETUP && ros2 launch wheeltec_web_teleop web_controller.launch.py' > a.txt" C-m
     
     # 回到第一個分頁並選取第一個窗格
     tmux select-window -t "$SESSION_NAME:0"
