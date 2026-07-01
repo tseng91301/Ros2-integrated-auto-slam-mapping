@@ -140,6 +140,10 @@ start_container() {
     /usr/src/jetson_multimedia_api \
     /usr/src/jetson_sipl_api \
     /usr/share/vpi3 \
+    /usr/local/zed \
+    /usr/local/cuda \
+    /usr/local/cuda-13 \
+    /usr/local/cuda-13.0 \
     /dev/input \
     /dev/bus/usb \
     /dev/video0 \
@@ -158,8 +162,54 @@ container_exec() {
 }
 
 install_inside_container() {
-  log "Installing base Isaac ROS packages inside container"
-  container_exec "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ros-jazzy-isaac-ros-common ros-jazzy-isaac-ros-examples v4l-utils ros-jazzy-v4l2-camera"
+  log "Installing base Isaac ROS and project packages inside container"
+
+  # 必要安裝套件清單 (可在此處新增或修改套件)
+  local PACKAGES=(
+    # 核心工具與編譯依賴
+    "build-essential"
+    "python3-colcon-common-extensions"
+    "python3-rosdep"
+    "ros-jazzy-rviz2"
+    "ros-jazzy-isaac-ros-common"
+    "ros-jazzy-isaac-ros-examples"
+
+    # 感測器與相機驅動
+    "v4l-utils"
+    "ros-jazzy-v4l2-camera"
+    "ros-jazzy-librealsense2"
+    "ros-jazzy-realsense2-camera"
+    "ros-jazzy-realsense2-camera-msgs"
+    "ros-jazzy-cv-bridge"
+    "ros-jazzy-theora-image-transport"
+    "ros-jazzy-compressed-image-transport"
+    "ros-jazzy-image-transport-plugins"
+
+    # ZED 開發與運行相依庫 (修復 ZED 套件編譯失敗問題)
+    "libusb-1.0-0-dev"
+    "libturbojpeg"
+    "libturbojpeg0-dev"
+    "tensorrt"
+
+    # 導航與 SLAM 套件
+    "ros-jazzy-navigation2"
+    "ros-jazzy-nav2-bringup"
+    "ros-jazzy-nav2-common"
+    "ros-jazzy-nav2-simple-commander"
+    "ros-jazzy-slam-toolbox"
+    "ros-jazzy-xacro"
+    "ros-jazzy-tf-transformations"
+
+    # 模擬與通訊工具
+    "ros-jazzy-ros-gz"
+    "ros-jazzy-ros-gz-sim-demos"
+    "ros-jazzy-gz-ros2-control"
+    "python3-serial"
+    "python3-matplotlib"
+    "python3-tornado"
+    "python3-requests"
+    "python3-tqdm"
+  )
 
   if [[ "$INSTALL_APRILTAG" == "1" ]]; then
     log "Installing AprilTag + NITROS stack inside container (this can take a long time)"

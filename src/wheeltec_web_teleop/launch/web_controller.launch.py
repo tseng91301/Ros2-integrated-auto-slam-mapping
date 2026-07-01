@@ -61,7 +61,7 @@ def generate_launch_description():
         
         # 2. Gazebo Server
         gazebo_server = ExecuteProcess(
-            cmd=['gz', 'sim', '-r', '-s', world_sdf],
+            cmd=['xvfb-run', '-a', 'gz', 'sim', '-r', '-s', world_sdf],
             output='screen'
         )
         

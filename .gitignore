@@ -10,3 +10,4 @@ ZED_Diagnostic_Results.json
 rosbags/
 t.sh
 a.txt
+debug_logs/
