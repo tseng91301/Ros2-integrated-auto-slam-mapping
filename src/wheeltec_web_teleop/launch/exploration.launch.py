@@ -54,8 +54,9 @@ def generate_launch_description():
 
         update_nested(params_data)
 
-        generated_params_path = '/tmp/nav2_params_with_slam_generated.yaml'
-        with open(generated_params_path, 'w') as f:
+        import tempfile
+        fd, generated_params_path = tempfile.mkstemp(prefix='nav2_params_', suffix='.yaml')
+        with os.fdopen(fd, 'w') as f:
             yaml.safe_dump(params_data, f)
     except Exception as e:
         print(f"Failed to generate dynamic params: {e}")
@@ -108,7 +109,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'params_file': '/tmp/nav2_params_with_slam_generated.yaml',
+            'params_file': generated_params_path,
             'autostart': 'true'
         }.items()
     )
