@@ -1,0 +1,134 @@
+================================================================================
+  ROS 2 COMMAND LIST FOR EXPLORATION & NAVIGATION (DECOMPOSED)
+================================================================================
+
+This file contains the decomposed individual command lines for both Exploration
+and Navigation, using the exact Docker prefix required:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec <command>'
+
+--------------------------------------------------------------------------------
+PART 1: EXPLORATION MODE (自主探索建圖)
+--------------------------------------------------------------------------------
+
+[Option A: Using Subsystem Launch Commands (Recommended for Simplicity)]
+------------------------------------------------------------------------
+1. SLAM Toolbox:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 launch wheeltec_slam_toolbox playrobot_online_async_launch.py use_sim_time:=true'
+
+2. Nav2 Navigation:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && rm -f /dev/shm/*fastrtps* && exec ros2 launch wheeltec_nav2 navigation_launch.py use_sim_time:=true params_file:=/tmp/nav2_params_with_slam_generated.yaml autostart:=true'
+
+3. Auto Explorer:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 launch auto_explorer auto_exploration.launch.py use_sim_time:=true'
+
+
+[Option B: Decomposed into Individual ROS 2 Node Runs]
+-------------------------------------------------------
+1. SLAM Toolbox (Lifecycle Node):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run slam_toolbox async_slam_toolbox_node --ros-args -p use_lifecycle_manager:=False -p use_sim_time:=true -p odom_frame:=odom'
+
+2. SLAM Toolbox Configure (Run after node starts):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 lifecycle set /slam_toolbox configure'
+
+3. SLAM Toolbox Activate (Run after configure finishes):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 lifecycle set /slam_toolbox activate'
+
+4. Nav2 Controller Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_controller controller_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+5. Nav2 Smoother Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_smoother smoother_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+6. Nav2 Planner Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_planner planner_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+7. Nav2 Route Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_route route_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+8. Nav2 Behavior Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_behaviors behavior_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+9. Nav2 Velocity Smoother:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_velocity_smoother velocity_smoother --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+10. Nav2 Collision Monitor:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_collision_monitor collision_monitor --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+11. Nav2 BT Navigator:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_bt_navigator bt_navigator --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+12. Nav2 Waypoint Follower:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_waypoint_follower waypoint_follower --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+13. Nav2 Docking Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run opennav_docking opennav_docking --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+14. Nav2 Lifecycle Manager (Brings up navigation stack):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args -p autostart:=true -p node_names:=["controller_server","smoother_server","planner_server","route_server","behavior_server","collision_monitor","bt_navigator","waypoint_follower","docking_server"]'
+
+15. Auto Explorer Node:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run auto_explorer explorer_node --ros-args -p use_sim_time:=true -p map_frame:=map -p robot_frame:=base_link -p linear_speed_max:=0.20 -p angular_speed_max:=0.6 -p obstacle_safety_dist:=1.0 -p obstacle_critical_dist:=0.4 -p robot_radius:=0.22 -p max_exploration_laps:=1 -p thumbtack_spacing:=0.5 -p local_search_radius:=3.0 -p hysteresis_factor:=1.25 -p sector_lock_cycles:=10 -p stuck_temp_threshold:=80.0 -p heatmap_decay_rate:=0.05 -p heatmap_heat_increment:=2.0'
+
+
+--------------------------------------------------------------------------------
+PART 2: NAVIGATION MODE (目標點自主導航)
+--------------------------------------------------------------------------------
+
+[Option A: Using Subsystem Launch Commands (Recommended for Simplicity)]
+------------------------------------------------------------------------
+1. Map Server & AMCL Localization:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 launch nav2_bringup localization_launch.py use_sim_time:=true map:=/workspaces/isaac_ros-dev/worlds/virtual/my-nav-map/maps/slam_map.yaml params_file:=/tmp/nav2_params_with_slam_generated.yaml autostart:=true'
+
+2. Nav2 Navigation:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 launch nav2_bringup navigation_launch.py use_sim_time:=true params_file:=/tmp/nav2_params_with_slam_generated.yaml autostart:=true'
+
+
+[Option B: Decomposed into Individual ROS 2 Node Runs]
+-------------------------------------------------------
+1. Nav2 Map Server (Loads Map):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_map_server map_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -p yaml_filename:=/workspaces/isaac_ros-dev/worlds/virtual/my-nav-map/maps/slam_map.yaml -p use_sim_time:=true --remap /tf:=tf --remap /tf_static:=tf_static'
+
+2. Nav2 AMCL (Adaptive Monte Carlo Localization):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_amcl amcl --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -p use_sim_time:=true --remap /tf:=tf --remap /tf_static:=tf_static'
+
+3. Nav2 Localization Lifecycle Manager (Brings up map_server & amcl):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args -p autostart:=true -p node_names:=["map_server","amcl"]'
+
+4. Nav2 Controller Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_controller controller_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+5. Nav2 Smoother Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_smoother smoother_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+6. Nav2 Planner Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_planner planner_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+7. Nav2 Route Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_route route_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+8. Nav2 Behavior Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_behaviors behavior_server --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+9. Nav2 Velocity Smoother:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_velocity_smoother velocity_smoother --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml -r cmd_vel:=cmd_vel_nav --remap /tf:=tf --remap /tf_static:=tf_static'
+
+10. Nav2 Collision Monitor:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_collision_monitor collision_monitor --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+11. Nav2 BT Navigator:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_bt_navigator bt_navigator --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+12. Nav2 Waypoint Follower:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_waypoint_follower waypoint_follower --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+13. Nav2 Docking Server:
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run opennav_docking opennav_docking --ros-args --params-file /tmp/nav2_params_with_slam_generated.yaml --remap /tf:=tf --remap /tf_static:=tf_static'
+
+14. Nav2 Navigation Lifecycle Manager (Brings up navigation stack):
+docker exec -it isaac_ros_dev_container bash -lc 'export ROS_DOMAIN_ID=55 && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && export DISPLAY=:0 && exec ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args -p autostart:=true -p node_names:=["controller_server","smoother_server","planner_server","route_server","behavior_server","velocity_smoother","collision_monitor","bt_navigator","waypoint_follower","docking_server"]'
+
+--------------------------------------------------------------------------------
+NOTE FOR PHYSICAL ROBOT RUN:
+- If running on the physical robot (is_sim: false), replace `use_sim_time:=true` with `use_sim_time:=false`.
+- Change `-p odom_frame:=odom` to `-p odom_frame:=odom_combined` for SLAM node.
+- Add `--remap odom:=odom_combined` to SLAM node argument list.

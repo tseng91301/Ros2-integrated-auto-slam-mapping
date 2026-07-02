@@ -48,19 +48,13 @@ def generate_launch_description():
     container_name = LaunchConfiguration('container_name')
     use_respawn = LaunchConfiguration('use_respawn')
     # map_subscribe_transient_local = LaunchConfiguration('map_subscribe_transient_local')
-    graph_filepath = LaunchConfiguration('graph')
 
     lifecycle_nodes = ['controller_server',
                        'smoother_server',
                        'planner_server',
-                       'route_server',
                        'behavior_server',
-                       'velocity_smoother',
-                    #    'collision_monitor',
                        'bt_navigator',
-                    #    'waypoint_follower',
-                    #    'docking_server'
-                       ]
+                       'waypoint_follower']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -118,11 +112,6 @@ def generate_launch_description():
         'use_respawn', default_value='False',
         description='Whether to respawn if a node crashes. Applied when composition is disabled.')
 
-    declare_graph_file_cmd = DeclareLaunchArgument(
-        'graph',
-        default_value='',
-        description='Path to the geojson graph file to load')
-
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
@@ -149,39 +138,12 @@ def generate_launch_description():
         parameters=[configured_params],
         remappings=remappings)
 
-    route_server = Node(
-        package='nav2_route',
-        executable='route_server',
-        name='route_server',
-        respawn=use_respawn,
-        respawn_delay=2.0,
-        parameters=[configured_params, {'graph_filepath': graph_filepath}],
-        remappings=remappings)
-
     behavior_server = Node(
         package='nav2_behaviors',
         executable='behavior_server',
         name='behavior_server',
         respawn=use_respawn,
         respawn_delay=2.0,
-        parameters=[configured_params],
-        remappings=remappings)
-
-    velocity_smoother = Node(
-        package='nav2_velocity_smoother',
-        executable='velocity_smoother',
-        name='velocity_smoother',
-        respawn=use_respawn,
-        respawn_delay=2.0,
-        parameters=[configured_params],
-        remappings=remappings + [('cmd_vel', 'cmd_vel_nav')])
-
-    collision_monitor = Node(
-        package='nav2_collision_monitor',
-        executable='collision_monitor',
-        name='collision_monitor',
-        respawn=use_respawn,
-        respawn_delay=3.0,
         parameters=[configured_params],
         remappings=remappings)
 
@@ -203,16 +165,6 @@ def generate_launch_description():
         parameters=[configured_params],
         remappings=remappings)
 
-    docking_server = Node(
-        package='opennav_docking',
-        executable='opennav_docking',
-        name='docking_server',
-        respawn=use_respawn,
-        respawn_delay=2.0,
-        parameters=[configured_params],
-        remappings=remappings)
-
-
     lifecycle_manager = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -221,20 +173,34 @@ def generate_launch_description():
                     {'autostart': autostart},
                     {'node_names': lifecycle_nodes}])
 
+    tier_1_control = GroupAction([
+        controller_server,
+        smoother_server,
+        planner_server
+    ])
+
+    tier_2_behaviors = TimerAction(
+        period=1.5,
+        actions=[behavior_server]
+    )
+
+    tier_3_brain = TimerAction(
+        period=3.0,
+        actions=[bt_navigator, waypoint_follower]
+    )
+
+    tier_4_manager = TimerAction(
+        period=4.5,
+        actions=[lifecycle_manager]
+    )
+
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(['not ', use_composition])),
         actions=[
-            controller_server,
-            TimerAction(period=1.0, actions=[smoother_server]),
-            TimerAction(period=2.0, actions=[planner_server]),
-            TimerAction(period=3.0, actions=[route_server]),
-            TimerAction(period=4.0, actions=[behavior_server]),
-            TimerAction(period=5.0, actions=[velocity_smoother]),
-            # TimerAction(period=11.0, actions=[collision_monitor]),
-            TimerAction(period=6.0, actions=[bt_navigator]),
-            # TimerAction(period=13.0, actions=[waypoint_follower]),
-            # TimerAction(period=14.0, actions=[docking_server]),
-            TimerAction(period=15.0, actions=[lifecycle_manager])
+            tier_1_control,
+            tier_2_behaviors,
+            tier_3_brain,
+            tier_4_manager
         ]
     )
 
@@ -261,47 +227,23 @@ def generate_launch_description():
                 parameters=[configured_params],
                 remappings=remappings),
             ComposableNode(
-                package='nav2_route',
-                plugin='nav2_route::RouteServer',
-                name='route_server',
-                parameters=[configured_params, {'graph_filepath': graph_filepath}],
-                remappings=remappings),
-            ComposableNode(
                 package='nav2_behaviors',
                 plugin='behavior_server::BehaviorServer',
                 name='behavior_server',
                 parameters=[configured_params],
                 remappings=remappings),
             ComposableNode(
-                package='nav2_velocity_smoother',
-                plugin='nav2_velocity_smoother::VelocitySmoother',
-                name='velocity_smoother',
-                parameters=[configured_params],
-                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')]),
-            # ComposableNode(
-            #     package='nav2_collision_monitor',
-            #     plugin='nav2_collision_monitor::CollisionMonitor',
-            #     name='collision_monitor',
-            #     parameters=[configured_params],
-            #     remappings=remappings),
-            ComposableNode(
                 package='nav2_bt_navigator',
                 plugin='nav2_bt_navigator::BtNavigator',
                 name='bt_navigator',
                 parameters=[configured_params],
                 remappings=remappings),
-            # ComposableNode(
-            #     package='nav2_waypoint_follower',
-            #     plugin='nav2_waypoint_follower::WaypointFollower',
-            #     name='waypoint_follower',
-            #     parameters=[configured_params],
-            #     remappings=remappings),
-            # ComposableNode(
-            #     package='opennav_docking',
-            #     plugin='opennav_docking::DockingServer',
-            #     name='docking_server',
-            #     parameters=[configured_params],
-            #     remappings=remappings),
+            ComposableNode(
+                package='nav2_waypoint_follower',
+                plugin='nav2_waypoint_follower::WaypointFollower',
+                name='waypoint_follower',
+                parameters=[configured_params],
+                remappings=remappings),
             ComposableNode(
                 package='nav2_lifecycle_manager',
                 plugin='nav2_lifecycle_manager::LifecycleManager',
@@ -322,7 +264,6 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
-    ld.add_action(declare_graph_file_cmd)
     ld.add_action(declare_autostart_cmd)
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_container_name_cmd)

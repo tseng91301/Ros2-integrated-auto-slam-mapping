@@ -219,7 +219,7 @@ fi
 
 # 共用指令前綴
 DOCKER_EXEC="docker exec -it isaac_ros_dev_container"
-ROS2_SETUP="export ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL} && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash"
+ROS2_SETUP="export ROS_DOMAIN_ID=${ROS_DOMAIN_ID_VAL} && source /opt/ros/jazzy/setup.bash && source /workspaces/isaac_ros-dev/install/setup.bash && rm -f /dev/shm/*fastrtps* "
 
 # Check if simulation mode is configured in YAML and adjust preset accordingly
 if [ "$IS_SIM" == "true" ] || [ "$IS_SIM" == "True" ]; then

@@ -105,7 +105,7 @@ def generate_launch_description():
     # Nav2 Navigation
     navigation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('nav2_bringup'), 'launch', 'navigation_launch.py')
+            os.path.join(get_package_share_directory('wheeltec_nav2'), 'launch', 'navigation_launch.py')
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
@@ -123,6 +123,7 @@ def generate_launch_description():
             'use_sim_time': use_sim_time
         }.items()
     )
+    print("No navigation launch!")
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -133,6 +134,6 @@ def generate_launch_description():
         slam_toolbox_node,
         configure_event,
         activate_event,
-        navigation_launch,
+        # navigation_launch,
         auto_exploration_launch
     ])

@@ -70,7 +70,7 @@ def generate_launch_description():
         description='Use simulation (Gazebo) clock if true'
     )
 
-    bringup_dir = get_package_share_directory('nav2_bringup')
+    bringup_dir = get_package_share_directory('wheeltec_nav2')
     
     # 1. Localization (map_server + AMCL)
     localization_launch = IncludeLaunchDescription(

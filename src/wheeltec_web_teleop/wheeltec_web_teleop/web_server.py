@@ -1,3 +1,4 @@
+from PIL import ExifTags
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
@@ -30,6 +31,7 @@ from rclpy.action import ActionClient
 from std_srvs.srv import Trigger
 import asyncio
 import time
+import signal
 
 # Global variables to store the node and active web socket clients
 ros_node = None
@@ -57,14 +59,12 @@ def is_simulation_mode():
     is_sim_val = robot_params.get('simulation', {}).get('is_sim', False)
     return str(is_sim_val).lower() == 'true'
 
-def get_active_maps_dir():
+def get_map_dir():
     is_sim = is_simulation_mode()
     
     if is_sim:
         robot_params = {}
         params_path = '/workspaces/isaac_ros-dev/robot_params.yaml'
-        if not os.path.exists(params_path):
-            params_path = '/home/ubuntu/workspaces/isaac_ros-dev/robot_params.yaml'
         
         if os.path.exists(params_path):
             try:
@@ -89,49 +89,22 @@ def get_active_maps_dir():
         os.makedirs(phys_dir, exist_ok=True)
         return phys_dir
 
-def get_map_dir():
-    return get_active_maps_dir()
-
 def get_map_yaml_path(map_name):
     if os.path.isabs(map_name):
         return map_name if os.path.exists(map_name) else None
         
     # Search in active maps directory first
-    active_dir = get_active_maps_dir()
-    yaml_path = os.path.join(active_dir, f"{map_name}.yaml")
+    yaml_path = os.path.join(get_map_dir(), f"{map_name}.yaml")
     if os.path.exists(yaml_path):
         return yaml_path
-        
-    # Fallback search dirs
-    search_dirs = [
-        "/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
-        "/home/ubuntu/workspaces/isaac_ros-dev/src/wheeltec_robot_nav2/map",
-        "/home/ubuntu/maps"
-    ]
-    try:
-        search_dirs.append(os.path.join(get_package_share_directory('wheeltec_nav2'), 'map'))
-    except Exception:
-        pass
-        
-    for d in search_dirs:
-        yaml_path = os.path.join(d, f"{map_name}.yaml")
-        if os.path.exists(yaml_path):
-            return yaml_path
-    return None
+    else:
+        return None
 
 def get_default_map_name():
-    maps_dir = get_active_maps_dir()
+    maps_dir = get_map_dir()
     if os.path.exists(maps_dir):
-        # Search candidates in order
-        candidates = ["slam_map", "stored_map", "map"]
-        for c in candidates:
-            if os.path.exists(os.path.join(maps_dir, f"{c}.yaml")):
-                return c
-        # Look for any .yaml
-        yamls = [f[:-5] for f in os.listdir(maps_dir) if f.endswith('.yaml')]
-        if yamls:
-            return yamls[0]
-    return "map"
+        return os.path.join(maps_dir, "slam_map.yaml")
+    return None
 
 
 def load_map_from_disk(yaml_path):
@@ -282,6 +255,7 @@ class TeleopNode(Node):
         # Subprocess control for exploration and navigation launches
         self.active_launch_proc = None
         self.current_launch_type = None
+        self.current_map_name = None
         self._auto_start_timer = self.create_timer(1.0, self.auto_start_exploration)
         
         # Publisher for AMCL initialization
@@ -303,33 +277,104 @@ class TeleopNode(Node):
     def auto_start_exploration(self):
         if hasattr(self, '_auto_start_timer'):
             self._auto_start_timer.cancel()
-        self.start_sub_launch("exploration")
+        if self.active_launch_proc is None:
+            self.start_sub_launch("exploration")
+        else:
+            self.get_logger().info("An active launch process is already running, skipping auto-start.")
+
+    def _get_pids_in_group(self, pgid):
+        """
+        透過給定的 行程組 ID (PGID)，抓出系統中目前屬於該群組的所有子進程 PID 清單。
+        """
+        pids = []
+        try:
+            # 使用 ps -e -o pgid,pid 指令，這會列出系統中所有進程的 PGID 和 PID
+            result = subprocess.run(
+                ['ps', '-e', '-o', 'pgid,pid'], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            
+            # 逐行解析輸出結果
+            for line in result.stdout.split('\n'):
+                parts = line.split()
+                if len(parts) == 2:
+                    try:
+                        line_pgid = int(parts[0])
+                        line_pid = int(parts[1])
+                        
+                        # 如果進程的 PGID 與我們要找的一致，就把它記錄下來
+                        if line_pgid == pgid:
+                            pids.append(line_pid)
+                    except ValueError:
+                        continue # 略過標題列（PGID PID）
+                        
+        except Exception as e:
+            self.get_logger().error(f"Error fetching PIDs for group {pgid}: {e}")
+            
+        return pids
 
     def start_sub_launch(self, launch_type, map_name=None):
+        if launch_type == "navigation" and map_name is not None:
+            self.current_map_name = map_name
         # If there is an active launch process, terminate it cleanly
         if self.active_launch_proc is not None:
             self.get_logger().info(f"Terminating active launch process: {self.current_launch_type}")
-            self.active_launch_proc.terminate()
+            
             try:
-                self.active_launch_proc.wait(timeout=5)
+                # 1. 取得主行程的行程組 ID (PGID)
+                pgid = os.getpgid(self.active_launch_proc.pid)
+                self.get_logger().info(f"Targeting process group: {pgid}")
+                
+                # 💡 【全新功能】在殺除前，先抓出群組內究竟有哪些子進程
+                group_pids = self._get_pids_in_group(pgid)
+                self.get_logger().info(f"Found {len(group_pids)} active member PIDs in group {pgid}: {group_pids}")
+                
+                # 2. 嘗試溫和地對整個行程組發送 SIGINT (Ctrl+C)
+                self.get_logger().info("Sending SIGINT to the process group...")
+                os.killpg(pgid, signal.SIGINT)
+                
+                # 3. 縮短等待時間到 1.5 秒
+                self.active_launch_proc.wait(timeout=1.5)
+                self.get_logger().info("Process group exited cleanly via SIGINT.")
+                
             except subprocess.TimeoutExpired:
-                self.active_launch_proc.kill()
-            self.active_launch_proc = None
-            
-            # Additional cleanup of nodes to prevent leftovers
-            if self.current_launch_type == "exploration":
-                cmd = ["pkill", "-9", "-f", "async_slam_toolbox_node|auto_explorer|explorer_node"]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            elif self.current_launch_type == "navigation":
-                cmd = ["pkill", "-9", "-f", "map_server|amcl|planner_server|controller_server|bt_navigator|behavior_server|waypoint_follower|smoother_server|velocity_smoother|collision_monitor|lifecycle_manager"]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            time.sleep(1.0)
+                self.get_logger().warn("SIGINT timeout! Commencing targeted internal execution...")
+                
+                # 4. 如果溫和關閉超時，我們不再只依賴盲目的 os.killpg，而是對剛才抓到的 PID 清單進行定點獵殺
+                killed_count = 0
+                for target_pid in group_pids:
+                    try:
+                        # 排除自己目前這個主程式的 PID，安全第一
+                        if target_pid == os.getpid():
+                            continue
+                            
+                        # 直接對每個頑固的子進程 PID 執行 kill -9
+                        os.kill(target_pid, signal.SIGKILL)
+                        killed_count += 1
+                    except ProcessLookupError:
+                        pass # 該進程可能在剛剛的 1.5 秒內剛好自己死掉了
+                    except Exception as e:
+                        self.get_logger().error(f"Failed to kill group member PID {target_pid}: {e}")
+                        
+                self.get_logger().info(f"Targeted group execution finished. Cleared {killed_count} stubborn nodes.")
+                
+                # 最後保險：釋放 Popen 資源
+                try:
+                    self.active_launch_proc.wait()
+                except Exception:
+                    pass
+                    
+            except Exception as e:
+                self.get_logger().error(f"Error during process group termination: {e}")
+            time.sleep(1.5)  # 給硬體和 ROS 2 網路拓撲一點時間釋放連接埠
             
         # Determine use_sim_time
         try:
             use_sim_time = self.get_parameter('use_sim_time').value
-        except Exception:
+        except Exception as e:
+            self.get_logger().error(f"Error getting use_sim_time: {e}")
             self.declare_parameter('use_sim_time', False)
             use_sim_time = self.get_parameter('use_sim_time').value
 
@@ -339,38 +384,40 @@ class TeleopNode(Node):
         ]
         
         if launch_type == "navigation":
-            # Determine yaml path
             yaml_path = None
             if map_name:
                 yaml_path = get_map_yaml_path(map_name)
             if not yaml_path:
-                # Try default map name from active world/mode maps directory
                 default_name = get_default_map_name()
                 yaml_path = get_map_yaml_path(default_name)
-            if not yaml_path:
-                # Try fallback defaults
-                for fallback_name in ["map_1750318412", "WHEELTEC", "map"]:
-                    path = get_map_yaml_path(fallback_name)
-                    if path and os.path.exists(path):
-                        yaml_path = path
-                        break
-            if not yaml_path:
-                # Find first yaml in maps directory
-                map_dir = get_map_dir()
-                if os.path.exists(map_dir):
-                    yamls = [f for f in os.listdir(map_dir) if f.endswith('.yaml')]
-                    if yamls:
-                        yaml_path = os.path.join(map_dir, yamls[0])
             
             if yaml_path:
                 self.get_logger().info(f"Using map file: {yaml_path}")
                 cmd.append(f"map:={yaml_path}")
             else:
                 self.get_logger().error("No map file found for navigation launch!")
+                return # 找不到地圖就中斷，避免開出壞掉的 navigation
                 
         self.get_logger().info(f"Launching subprocess: {' '.join(cmd)}")
-        self.active_launch_proc = subprocess.Popen(cmd)
+        
+        # 【關鍵修改】：加上 preexec_fn=os.setsid
+        # 這會讓啟動的 ros2 launch 擁有自己獨立的 Session 和 Process Group
+        # 後續才能用 os.killpg 一網打盡
+        self.active_launch_proc = subprocess.Popen(cmd, preexec_fn=os.setsid)
         self.current_launch_type = launch_type
+
+    def restart_current_launch(self):
+        launch_type = self.current_launch_type
+        if not launch_type:
+            launch_type = "exploration"
+        
+        self.get_logger().info(f"Restarting current launch: {launch_type}")
+        if launch_type == "navigation":
+            self.capture_last_pose()
+            self.start_sub_launch("navigation", map_name=self.current_map_name)
+            self.trigger_nav_initialization()
+        else:
+            self.start_sub_launch("exploration")
 
     def destroy_node(self):
         if self.active_launch_proc is not None:
@@ -991,13 +1038,38 @@ class NavigationHandler(tornado.web.RequestHandler):
 class ListMapsHandler(tornado.web.RequestHandler):
     """API endpoint to list maps on the server."""
     def get(self):
-        d = get_active_maps_dir()
+        d = get_map_dir()
         maps = set()
         if os.path.exists(d):
             for file in os.listdir(d):
                 if file.endswith(".yaml"):
                     maps.add(file[:-5])  # Remove .yaml
         self.write(json.dumps({"maps": sorted(list(maps))}))
+
+
+class ResetLaunchHandler(tornado.web.RequestHandler):
+    """Resets and restarts the current launch process (exploration or navigation)."""
+    def get(self):
+        try:
+            if ros_node is not None:
+                launch_type = ros_node.current_launch_type or "exploration"
+                ros_node.restart_current_launch()
+                self.write(json.dumps({
+                    "status": "success",
+                    "message": f"Successfully restarted {launch_type} launch process."
+                }))
+            else:
+                self.set_status(500)
+                self.write(json.dumps({
+                    "status": "error",
+                    "message": "ROS node is not initialized."
+                }))
+        except Exception as e:
+            self.set_status(500)
+            self.write(json.dumps({
+                "status": "error",
+                "message": str(e)
+            }))
 
 
 class WSHandler(tornado.websocket.WebSocketHandler):
@@ -1317,6 +1389,7 @@ def main():
         (r"/teleop", TeleopHandler),
         (r"/explorer", ExplorerHandler),
         (r"/navigation", NavigationHandler),
+        (r"/reset_launch", ResetLaunchHandler),
         (r"/ws", WSHandler),
         (r"/api/download_map", DownloadMapHandler),
         (r"/api/download_trajectory", DownloadTrajectoryHandler),
